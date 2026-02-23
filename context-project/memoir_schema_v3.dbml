@@ -1,0 +1,366 @@
+// =============================================================
+// PROJECT: memoir. — Receipt Photobooth SaaS
+// Schema v2 — February 2026
+// Model: Tiered Subscription per Owner + Withdrawal Flow
+// =============================================================
+
+// -------------------------------------------------------------
+// ENUMS
+// -------------------------------------------------------------
+
+Enum tx_status {
+  PENDING
+  PAID
+  FAILED
+}
+
+Enum payment_method {
+  PG          [note: "Payment Gateway (ex: Midtrans, Xendit)"]
+  CASH
+  STATIC_QRIS
+}
+
+Enum mutation_type {
+  CREDIT       [note: "Saldo masuk"]
+  DEBIT        [note: "Saldo keluar"]
+}
+
+Enum mutation_category {
+  TRANSACTION_INCOME  [note: "Pendapatan dari sesi foto"]
+  WITHDRAWAL          [note: "Penarikan saldo ke rekening owner"]
+  ADJUSTMENT          [note: "Koreksi manual oleh platform admin"]
+}
+
+Enum user_role {
+  platform_admin
+  studio_owner
+}
+
+Enum billing_period {
+  MONTHLY
+  YEARLY
+}
+
+Enum subscription_status {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+  GRACE_PERIOD  [note: "Belum bayar tapi masih diberi waktu toleransi"]
+}
+
+Enum withdrawal_status {
+  PENDING
+  PROCESSED
+  REJECTED
+}
+
+Enum element_type {
+  photo_slot   [note: "Area tempat foto user ditempelkan saat sesi"]
+  image        [note: "Gambar statis dekoratif (sticker, logo, watermark)"]
+  text         [note: "Teks statis (judul, tanggal, branding)"]
+  shape        [note: "Bentuk geometris (rect, circle, line)"]
+}
+
+// -------------------------------------------------------------
+// 1. USERS
+// -------------------------------------------------------------
+
+Table users as U {
+  id uuid [pk, default: `gen_random_uuid()`]
+  email varchar [unique, not null]
+  password_hash varchar [not null]
+  role user_role [not null, default: 'studio_owner']
+  wallet_balance bigint [not null, default: 0, note: "Cache saldo. Update via trigger wallet_mutations."]
+
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null]
+  deleted_at timestamptz [note: "Soft delete"]
+}
+
+// -------------------------------------------------------------
+// 2. SUBSCRIPTION PLANS (Tier)
+// -------------------------------------------------------------
+
+Table subscription_plans as SP {
+  id uuid [pk, default: `gen_random_uuid()`]
+  name varchar [not null, note: "Ex: 'Starter', 'Pro', 'Business'"]
+  description text
+
+  max_kiosks integer [not null, note: "Maksimal jumlah kiosk aktif. Ex: 1, 3, 10"]
+
+  price_monthly bigint [not null, note: "Harga per bulan dalam Rupiah"]
+  price_yearly bigint [not null, note: "Harga per tahun (biasanya lebih murah dari 12x monthly)"]
+
+  is_active boolean [not null, default: true, note: "False = plan tidak bisa dipilih owner baru, tapi existing tidak terganggu"]
+
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null]
+
+  Note: "Daftar tier yang ditawarkan memoir. ke studio owner. Dikelola platform admin."
+}
+
+// -------------------------------------------------------------
+// 3. SUBSCRIPTIONS (Langganan Owner)
+// -------------------------------------------------------------
+
+Table subscriptions as SUB {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null]
+  plan_id uuid [not null]
+
+  billing_period billing_period [not null]
+  status subscription_status [not null, default: 'ACTIVE']
+
+  // Snapshot harga saat subscribe (agar perubahan plan tidak mempengaruhi yang sudah jalan)
+  price_paid bigint [not null, note: "Nominal yang dibayar untuk periode ini"]
+
+  current_period_start timestamptz [not null]
+  current_period_end timestamptz [not null, note: "Batas akhir periode aktif. Cron job cek kolom ini."]
+
+  // Jika owner upgrade/downgrade, catat plan lama
+  previous_plan_id uuid [note: "Null jika ini subscription pertama"]
+
+  cancelled_at timestamptz [note: "Diisi jika owner request cancel"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null]
+
+  Note: "Satu owner hanya boleh punya SATU subscription ACTIVE di satu waktu. Enforce di aplikasi."
+}
+
+// -------------------------------------------------------------
+// 4. SUBSCRIPTION INVOICES
+// -------------------------------------------------------------
+
+Table subscription_invoices as SI {
+  id uuid [pk, default: `gen_random_uuid()`]
+  subscription_id uuid [not null]
+  user_id uuid [not null, note: "Denormalisasi untuk kemudahan query"]
+
+  amount bigint [not null]
+  billing_period billing_period [not null]
+  status tx_status [not null, default: 'PENDING']
+
+  payment_method payment_method
+  payment_url text [note: "URL checkout jika pakai PG"]
+  order_id varchar [unique, not null, note: "Ref ID untuk payment gateway"]
+
+  period_start timestamptz [not null]
+  period_end timestamptz [not null]
+
+  paid_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+
+  Note: "Setiap renewal/pembayaran subscription menghasilkan satu invoice."
+}
+
+// -------------------------------------------------------------
+// 5. PLATFORM CONFIG
+// -------------------------------------------------------------
+
+Table platform_config as PC {
+  id uuid [pk, default: `gen_random_uuid()`]
+  key varchar [unique, not null, note: "Ex: 'grace_period_days', 'default_plan_id'"]
+  value text [not null]
+  description text
+  updated_by uuid [not null]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+// -------------------------------------------------------------
+// 6. KIOSKS
+// -------------------------------------------------------------
+
+Table kiosks as K {
+  id uuid [pk, default: `gen_random_uuid()`]
+  owner_id uuid [not null]
+  name varchar [not null]
+
+  pairing_code varchar [unique, note: "6 digit. Null setelah paired."]
+  device_token varchar [unique, note: "Token permanen Electron app."]
+  paired_at timestamptz
+  is_active boolean [not null, default: true]
+
+  price_base_session bigint [not null, default: 25000]
+  price_per_extra_print bigint [not null, default: 5000]
+  price_digital_copy bigint [not null, default: 10000]
+
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null]
+  deleted_at timestamptz
+}
+
+// -------------------------------------------------------------
+// 7. TEMPLATES & ELEMENTS
+// -------------------------------------------------------------
+
+Table templates as T {
+  id uuid [pk, default: `gen_random_uuid()`]
+  owner_id uuid [not null]
+  name varchar [not null]
+
+  width integer [not null, default: 576]
+  height integer [not null]
+  background_url text [not null]
+  overlay_url text
+
+  override_price_base bigint
+  override_price_extra_print bigint
+  override_price_digital_copy bigint
+
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, note: "Dipakai Electron untuk cek apakah perlu sync ulang"]
+}
+
+Table template_elements as TE {
+  id uuid [pk, default: `gen_random_uuid()`]
+  template_id uuid [not null]
+  element_type element_type [not null]
+
+  // ── Shared spatial attributes (semua tipe punya ini) ──
+  sequence integer [not null, note: "Z-index / render order"]
+  x integer [not null]
+  y integer [not null]
+  width integer [not null]
+  height integer [not null]
+  rotation integer [not null, default: 0]
+  opacity integer [not null, default: 100, note: "0-100"]
+
+  // ── Type-specific properties ──
+  // photo_slot : { borderRadius?, borderWidth?, borderColor? }
+  // image      : { imageUrl, fit: cover|contain|fill, borderRadius? }
+  // text       : { content, fontFamily, fontSize, fontWeight, color, textAlign, letterSpacing? }
+  // shape      : { shapeType: rect|circle|line, fill?, stroke?, strokeWidth?, borderRadius? }
+  properties jsonb [not null, default: '{}', note: "Atribut spesifik per element_type. Lihat komentar di atas untuk struktur per tipe."]
+
+  created_at timestamptz [not null, default: `now()`]
+
+  Note: "Polymorphic single-table: kolom spasial relasional, data tipe-spesifik di JSONB properties. Renderer manapun bisa render tanpa library khusus."
+}
+
+// -------------------------------------------------------------
+// 8. TRANSAKSI KIOSK
+// -------------------------------------------------------------
+
+Table transactions as TX {
+  id uuid [pk, default: `gen_random_uuid()`]
+  owner_id uuid [not null, note: "Denormalisasi dari kiosk.owner_id"]
+  kiosk_id uuid [not null]
+  template_id uuid [not null]
+
+  order_id varchar [unique, not null]
+  status tx_status [not null, default: 'PENDING']
+  payment_method payment_method [not null]
+  payment_url text
+
+  print_qty integer [not null, default: 1]
+  has_digital_copy boolean [not null, default: false]
+
+  applied_base_price bigint [not null]
+  applied_extra_print_price bigint [not null]
+  applied_digital_copy_price bigint [not null, default: 0]
+  total_amount bigint [not null]
+
+  created_at timestamptz [not null, default: `now()`]
+  paid_at timestamptz
+}
+
+// -------------------------------------------------------------
+// 9. SESSIONS (hanya jika has_digital_copy = true)
+// -------------------------------------------------------------
+
+Table sessions as S {
+  id uuid [pk, default: `gen_random_uuid()`]
+  transaction_id uuid [not null, unique]
+  result_image_url text [not null]
+  deletion_scheduled_at timestamptz [note: "Null = simpan selamanya"]
+  created_at timestamptz [not null, default: `now()`]
+
+  Note: "Row HANYA dibuat jika transaction.has_digital_copy = TRUE."
+}
+
+// -------------------------------------------------------------
+// 10. WALLET MUTATIONS
+// -------------------------------------------------------------
+
+Table wallet_mutations as WM {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null]
+  transaction_ref_id uuid [note: "FK ke transactions jika dari sesi foto"]
+  withdrawal_ref_id uuid [note: "FK ke withdrawals jika dari penarikan"]
+
+  type mutation_type [not null]
+  category mutation_category [not null]
+  amount bigint [not null, note: "Nilai absolut"]
+  current_balance_snapshot bigint [not null, note: "Saldo SETELAH mutasi ini"]
+  description text
+
+  created_at timestamptz [not null, default: `now()`]
+
+  Note: "Hanya satu dari transaction_ref_id atau withdrawal_ref_id yang boleh diisi per baris."
+}
+
+// -------------------------------------------------------------
+// 11. WITHDRAWALS
+// -------------------------------------------------------------
+
+Table withdrawals as W {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null]
+
+  amount bigint [not null, note: "Jumlah yang diminta owner untuk ditarik"]
+  status withdrawal_status [not null, default: 'PENDING']
+
+  // Informasi rekening tujuan
+  bank_name varchar [not null, note: "Ex: 'BCA', 'Mandiri', 'BRI'"]
+  bank_account_number varchar [not null]
+  bank_account_name varchar [not null]
+
+  // Diisi oleh platform admin saat memproses
+  processed_by uuid [note: "FK ke users (platform_admin)"]
+  processed_at timestamptz
+  rejection_note text [note: "Diisi jika status = REJECTED. Alasan penolakan untuk owner."]
+
+  // Diisi setelah PROCESSED — link ke mutasi saldo yang terjadi
+  wallet_mutation_id uuid [note: "FK ke wallet_mutations. Null selama masih PENDING/REJECTED."]
+
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null]
+
+  Note: "Flow: owner request → PENDING → admin approve → wallet DEBIT dibuat → PROCESSED. Atau admin reject → REJECTED, saldo tidak berkurang."
+}
+
+// =============================================================
+// RELATIONSHIPS
+// =============================================================
+
+// Users
+Ref: U.id < K.owner_id
+Ref: U.id < T.owner_id
+Ref: U.id < WM.user_id
+Ref: U.id < PC.updated_by
+Ref: U.id < SUB.user_id
+Ref: U.id < SI.user_id
+Ref: U.id < W.user_id
+Ref: U.id < W.processed_by
+
+// Subscription
+Ref: SP.id < SUB.plan_id
+Ref: SP.id < SUB.previous_plan_id
+Ref: SUB.id < SI.subscription_id
+
+// Template Elements
+Ref: T.id < TE.template_id [delete: cascade]
+
+// Transactions
+Ref: K.id < TX.kiosk_id
+Ref: T.id < TX.template_id
+Ref: U.id < TX.owner_id
+
+// Session
+Ref: TX.id - S.transaction_id
+
+// Wallet
+Ref: TX.id < WM.transaction_ref_id
+Ref: W.id < WM.withdrawal_ref_id
+Ref: WM.id - W.wallet_mutation_id
