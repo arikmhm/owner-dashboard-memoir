@@ -1,0 +1,334 @@
+{
+  "info": {
+    "name": "Memoir — Kiosk Runtime (EPIC-02)",
+    "description": "Kiosk runtime endpoints: config, templates, transactions, payments, sessions.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000/api/v1" },
+    { "key": "deviceToken", "value": "" },
+    { "key": "transactionId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Get Kiosk Config",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/kiosk/me",
+        "header": [{ "key": "Authorization", "value": "Bearer {{deviceToken}}" }]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "pm.test('has kiosk config', () => {",
+              "  const d = pm.response.json().data;",
+              "  pm.expect(d.kiosk.id).to.be.a('string');",
+              "  pm.expect(d.subscriptionStatus).to.be.oneOf(['ACTIVE','EXPIRED','CANCELLED','GRACE_PERIOD']);",
+              "  pm.expect(d.gracePeriodDaysRemaining).to.be.a('number');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Sync Templates",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/kiosk/templates",
+        "header": [{ "key": "Authorization", "value": "Bearer {{deviceToken}}" }]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "pm.test('returns array', () => {",
+              "  const d = pm.response.json().data;",
+              "  pm.expect(d).to.be.an('array');",
+              "  if (d.length > 0) {",
+              "    pm.expect(d[0].template).to.have.property('id');",
+              "    pm.expect(d[0].elements).to.be.an('array');",
+              "    pm.collectionVariables.set('templateId', d[0].template.id);",
+              "  }",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Create Transaction — CASH",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/kiosk/transactions",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{deviceToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"templateId\": \"{{templateId}}\",\n  \"paymentMethod\": \"CASH\",\n  \"printQty\": 1,\n  \"hasDigitalCopy\": false,\n  \"totalAmount\": 25000\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('201 Created', () => pm.response.to.have.status(201));",
+              "pm.test('transaction created', () => {",
+              "  const d = pm.response.json().data;",
+              "  pm.expect(d.transaction.status).to.eql('PENDING');",
+              "  pm.expect(d.transaction.paymentMethod).to.eql('CASH');",
+              "  pm.expect(d.paymentUrl).to.be.null;",
+              "  pm.collectionVariables.set('transactionId', d.transaction.id);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Confirm Cash Payment",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/kiosk/transactions/{{transactionId}}/confirm-cash",
+        "header": [{ "key": "Authorization", "value": "Bearer {{deviceToken}}" }]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "pm.test('transaction PAID', () => {",
+              "  const tx = pm.response.json().data.transaction;",
+              "  pm.expect(tx.status).to.eql('PAID');",
+              "  pm.expect(tx.paidAt).to.be.a('string');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Confirm Cash — Idempotent (already PAID)",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/kiosk/transactions/{{transactionId}}/confirm-cash",
+        "header": [{ "key": "Authorization", "value": "Bearer {{deviceToken}}" }]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200 OK idempotent', () => pm.response.to.have.status(200));",
+              "pm.test('still PAID', () => {",
+              "  pm.expect(pm.response.json().data.transaction.status).to.eql('PAID');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Create Transaction — PG",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/kiosk/transactions",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{deviceToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"templateId\": \"{{templateId}}\",\n  \"paymentMethod\": \"PG\",\n  \"printQty\": 1,\n  \"hasDigitalCopy\": false,\n  \"totalAmount\": 25000\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('201 Created', () => pm.response.to.have.status(201));",
+              "pm.test('PG transaction with paymentUrl', () => {",
+              "  const d = pm.response.json().data;",
+              "  pm.expect(d.transaction.paymentMethod).to.eql('PG');",
+              "  pm.expect(d.paymentUrl).to.be.a('string');",
+              "  pm.collectionVariables.set('pgTransactionId', d.transaction.id);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Check PG Payment Status",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/kiosk/transactions/{{pgTransactionId}}/check-payment",
+        "header": [{ "key": "Authorization", "value": "Bearer {{deviceToken}}" }]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "pm.test('valid status', () => {",
+              "  const s = pm.response.json().data.status;",
+              "  pm.expect(s).to.be.oneOf(['PENDING','PAID','FAILED']);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Upload Session — Happy Path",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/kiosk/sessions",
+        "header": [{ "key": "Authorization", "value": "Bearer {{deviceToken}}" }],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "transactionId",
+              "value": "{{transactionId}}",
+              "type": "text"
+            },
+            { "key": "file", "type": "file", "src": "" }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('201 Created', () => pm.response.to.have.status(201));",
+              "pm.test('session created', () => {",
+              "  const d = pm.response.json().data;",
+              "  pm.expect(d.session.id).to.be.a('string');",
+              "  pm.expect(d.downloadUrl).to.be.a('string');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "ERR: Create Transaction — Price Mismatch",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/kiosk/transactions",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{deviceToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"templateId\": \"{{templateId}}\",\n  \"paymentMethod\": \"CASH\",\n  \"printQty\": 1,\n  \"hasDigitalCopy\": false,\n  \"totalAmount\": 99999\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('400 Price Mismatch', () => {",
+              "  pm.response.to.have.status(400);",
+              "  pm.expect(pm.response.json().error.code).to.eql('PRICE_MISMATCH');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "ERR: Confirm Cash — PG Transaction",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/kiosk/transactions/{{pgTransactionId}}/confirm-cash",
+        "header": [{ "key": "Authorization", "value": "Bearer {{deviceToken}}" }]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('422 Unprocessable', () => {",
+              "  pm.response.to.have.status(422);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "ERR: Check Payment — CASH Transaction",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/kiosk/transactions/{{transactionId}}/check-payment",
+        "header": [{ "key": "Authorization", "value": "Bearer {{deviceToken}}" }]
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('422 Unprocessable for CASH', () => {",
+              "  pm.response.to.have.status(422);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "ERR: Upload Session — No Auth",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/kiosk/sessions",
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            { "key": "transactionId", "value": "some-id", "type": "text" },
+            { "key": "file", "type": "file", "src": "" }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('401 Unauthorized', () => {",
+              "  pm.response.to.have.status(401);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    }
+  ]
+}

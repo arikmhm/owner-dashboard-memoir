@@ -1,9 +1,315 @@
-import { dummyPlans } from "@/lib/dummy-data";
+"use client";
+
+import { Suspense, useState, useEffect, useCallback, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useAuth } from "@/components/auth-provider";
 import { formatRupiah } from "@/lib/format";
+import {
+  createSubscription,
+  checkPaymentStatus,
+  getPlans,
+} from "@/lib/auth-api";
+import { ApiError } from "@/lib/api";
+import type { SubscriptionPlan, BillingPeriod } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  RefreshCw,
+  AlertCircle,
+} from "lucide-react";
+
+type OnboardingStep = "select-plan" | "checking-payment";
 
 export default function OnboardingPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-white">
+          <Loader2 className="h-5 w-5 animate-spin text-zinc-400" />
+        </div>
+      }
+    >
+      <OnboardingContent />
+    </Suspense>
+  );
+}
+
+function OnboardingContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const {
+    user,
+    isLoading: authLoading,
+    subscriptionStatus,
+    refreshSubscription,
+  } = useAuth();
+
+  const hasActiveSubscription =
+    subscriptionStatus === "ACTIVE" || subscriptionStatus === "GRACE_PERIOD";
+
+  const [step, setStep] = useState<OnboardingStep>("select-plan");
+  const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("MONTHLY");
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pendingInvoiceId, setPendingInvoiceId] = useState<string | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<
+    "idle" | "checking" | "paid" | "not-paid" | "failed"
+  >("idle");
+
+  // ── Fetch plans via TanStack Query ───────────────────────────────────────
+
+  const {
+    data: plans = [],
+    isLoading: plansLoading,
+    error: plansError,
+  } = useQuery<SubscriptionPlan[]>({
+    queryKey: ["subscription-plans"],
+    queryFn: getPlans,
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000, // plans rarely change
+    retry: 2,
+  });
+
+  // ── Create subscription mutation ─────────────────────────────────────────
+
+  const subscriptionMutation = useMutation({
+    mutationFn: createSubscription,
+    onSuccess: (result) => {
+      if (result.invoice.paymentUrl) {
+        // Redirect to payment gateway — Xendit will redirect back to
+        // /onboarding?invoice_id=<UUID> after payment
+        window.location.href = result.invoice.paymentUrl;
+      } else {
+        // No payment URL — stay on page, set invoice ID for checking
+        setPendingInvoiceId(result.invoice.id);
+        setStep("checking-payment");
+      }
+    },
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        if (err.status === 409) {
+          setError(
+            "Anda sudah berlangganan plan ini. Pilih plan atau periode lain.",
+          );
+        } else {
+          setError(err.message);
+        }
+      } else {
+        setError("Terjadi kesalahan, coba lagi nanti");
+      }
+    },
+    onSettled: () => {
+      setSelectedPlanId(null);
+    },
+  });
+
+  // Track whether auto-check has already been triggered (prevents re-fire)
+  const autoCheckTriggered = useRef(false);
+
+  // Check if returning from payment gateway
+  // Backend redirect URL uses invoice UUID directly in ?invoice_id=<UUID>
+  const invoiceIdFromUrl = searchParams.get("invoice_id");
+
+  useEffect(() => {
+    if (invoiceIdFromUrl) {
+      setPendingInvoiceId(invoiceIdFromUrl);
+      setStep("checking-payment");
+    }
+  }, [invoiceIdFromUrl]);
+
+  // Redirect if already has active subscription (but not if checking payment)
+  useEffect(() => {
+    if (!authLoading && hasActiveSubscription && !invoiceIdFromUrl) {
+      router.replace("/");
+    }
+  }, [authLoading, hasActiveSubscription, invoiceIdFromUrl, router]);
+
+  const handleSelectPlan = useCallback(
+    (planId: string) => {
+      setError(null);
+      setSelectedPlanId(planId);
+      subscriptionMutation.mutate({
+        planId,
+        billingPeriod,
+      });
+    },
+    [billingPeriod, subscriptionMutation],
+  );
+
+  const handleCheckPayment = useCallback(async () => {
+    if (!pendingInvoiceId) return;
+
+    setPaymentStatus("checking");
+    setError(null);
+
+    try {
+      const result = await checkPaymentStatus(pendingInvoiceId);
+
+      if (result.status === "PAID") {
+        setPaymentStatus("paid");
+        await refreshSubscription();
+        // Use full page navigation to force AuthProvider re-init with fresh
+        // subscription state — avoids race conditions with client-side routing
+        setTimeout(() => {
+          window.location.href = "/";
+        }, 1500);
+      } else if (result.status === "FAILED") {
+        setPaymentStatus("failed");
+      } else {
+        setPaymentStatus("not-paid");
+      }
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError("Gagal mengecek status pembayaran");
+      }
+      setPaymentStatus("idle");
+    }
+  }, [pendingInvoiceId, refreshSubscription]);
+
+  const handleBackToPlans = useCallback(() => {
+    setStep("select-plan");
+    setPendingInvoiceId(null);
+    setPaymentStatus("idle");
+    setError(null);
+    autoCheckTriggered.current = false;
+    router.replace("/onboarding");
+  }, [router]);
+
+  // Auto-check payment status when returning from Xendit
+  useEffect(() => {
+    if (
+      step === "checking-payment" &&
+      pendingInvoiceId &&
+      paymentStatus === "idle" &&
+      !autoCheckTriggered.current
+    ) {
+      autoCheckTriggered.current = true;
+      handleCheckPayment();
+    }
+  }, [step, pendingInvoiceId, paymentStatus, handleCheckPayment]);
+
+  // Loading state
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <Loader2 className="h-5 w-5 animate-spin text-zinc-400" />
+      </div>
+    );
+  }
+
+  // Not authenticated → AuthProvider will redirect
+  if (!user) return null;
+
+  // ── Step 2: Payment Check ──────────────────────────────────────────────
+  if (step === "checking-payment") {
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center px-4 py-16">
+        <div className="w-full max-w-md space-y-8 text-center">
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-zinc-400 uppercase tracking-widest">
+              memoir.
+            </p>
+            <h1 className="text-2xl font-semibold text-zinc-950 tracking-tight">
+              Cek Status Pembayaran
+            </h1>
+            <p className="text-sm text-zinc-500">
+              Setelah menyelesaikan pembayaran, tekan tombol di bawah untuk
+              memverifikasi.
+            </p>
+          </div>
+
+          {/* Status display */}
+          <div className="space-y-4">
+            {paymentStatus === "paid" && (
+              <div className="flex flex-col items-center gap-3 rounded-lg border border-green-200 bg-green-50 p-6">
+                <CheckCircle2 className="h-10 w-10 text-green-600" />
+                <div>
+                  <p className="text-sm font-medium text-green-800">
+                    Pembayaran berhasil!
+                  </p>
+                  <p className="text-xs text-green-600 mt-1">
+                    Mengalihkan ke dashboard...
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {paymentStatus === "not-paid" && (
+              <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4">
+                <p className="text-sm text-yellow-800">
+                  Pembayaran belum terdeteksi. Silakan selesaikan pembayaran
+                  terlebih dahulu, lalu coba lagi.
+                </p>
+              </div>
+            )}
+
+            {paymentStatus === "failed" && (
+              <div className="flex flex-col items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-6">
+                <XCircle className="h-10 w-10 text-red-500" />
+                <div>
+                  <p className="text-sm font-medium text-red-800">
+                    Pembayaran gagal atau kadaluarsa
+                  </p>
+                  <p className="text-xs text-red-600 mt-1">
+                    Silakan pilih plan dan buat pembayaran baru.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {error && (
+              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2">
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Actions */}
+          <div className="space-y-3">
+            {paymentStatus !== "paid" && paymentStatus !== "failed" && (
+              <Button
+                onClick={handleCheckPayment}
+                disabled={paymentStatus === "checking"}
+                className="w-full bg-zinc-950 text-white hover:bg-zinc-800"
+              >
+                {paymentStatus === "checking" ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Mengecek...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Cek Status Pembayaran
+                  </>
+                )}
+              </Button>
+            )}
+
+            {(paymentStatus === "failed" ||
+              paymentStatus === "not-paid" ||
+              paymentStatus === "idle") && (
+              <Button
+                variant="outline"
+                onClick={handleBackToPlans}
+                className="w-full"
+              >
+                Kembali ke Pilihan Plan
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Step 1: Plan Selection ─────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-white flex flex-col items-center justify-center px-4 py-16">
       <div className="w-full max-w-3xl space-y-10">
@@ -21,76 +327,175 @@ export default function OnboardingPage() {
           </p>
         </div>
 
-        {/* Billing toggle placeholder */}
+        {/* Billing toggle */}
         <div className="flex items-center justify-center gap-3">
-          <span className="text-sm font-medium text-zinc-950">Bulanan</span>
-          <div className="w-10 h-5 rounded-full bg-zinc-200 relative cursor-pointer">
-            <div className="w-4 h-4 rounded-full bg-white shadow absolute top-0.5 left-0.5 transition-all" />
-          </div>
-          <span className="text-sm text-zinc-400">Tahunan</span>
+          <span
+            className={`text-sm font-medium cursor-pointer transition ${
+              billingPeriod === "MONTHLY" ? "text-zinc-950" : "text-zinc-400"
+            }`}
+            onClick={() => setBillingPeriod("MONTHLY")}
+          >
+            Bulanan
+          </span>
+          <button
+            type="button"
+            onClick={() =>
+              setBillingPeriod((prev: BillingPeriod) =>
+                prev === "MONTHLY" ? "YEARLY" : "MONTHLY",
+              )
+            }
+            className="relative w-10 h-5 rounded-full bg-zinc-200 transition-colors focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:ring-offset-2"
+            role="switch"
+            aria-checked={billingPeriod === "YEARLY"}
+            aria-label="Toggle billing period"
+          >
+            <div
+              className={`w-4 h-4 rounded-full bg-white shadow absolute top-0.5 transition-all ${
+                billingPeriod === "YEARLY" ? "left-5.5" : "left-0.5"
+              }`}
+            />
+          </button>
+          <span
+            className={`text-sm cursor-pointer transition ${
+              billingPeriod === "YEARLY"
+                ? "text-zinc-950 font-medium"
+                : "text-zinc-400"
+            }`}
+            onClick={() => setBillingPeriod("YEARLY")}
+          >
+            Tahunan
+          </span>
           <Badge variant="secondary" className="text-xs">
             Hemat 2 bulan
           </Badge>
         </div>
 
-        {/* Plans Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {dummyPlans.map((plan, i) => (
-            <div
-              key={plan.id}
-              className={`border rounded-xl p-6 space-y-5 cursor-pointer transition ${i === 1
-                  ? "border-zinc-950 bg-zinc-950 text-white"
-                  : "border-zinc-200 bg-white text-zinc-950 hover:border-zinc-400"
-                }`}
-            >
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <p
-                    className={`text-xs font-semibold uppercase tracking-widest ${i === 1 ? "text-zinc-400" : "text-zinc-400"}`}
-                  >
-                    {plan.name}
-                  </p>
-                  {i === 1 && (
-                    <Badge className="text-[10px] bg-white text-zinc-950 hover:bg-white">
-                      Populer
-                    </Badge>
-                  )}
-                </div>
-                <p
-                  className={`text-2xl font-semibold ${i === 1 ? "text-white" : "text-zinc-950"}`}
-                >
-                  {formatRupiah(plan.price_monthly)}
-                  <span
-                    className={`text-sm font-normal ${i === 1 ? "text-zinc-400" : "text-zinc-400"}`}
-                  >
-                    /bln
-                  </span>
-                </p>
-                <p
-                  className={`text-xs ${i === 1 ? "text-zinc-400" : "text-zinc-500"}`}
-                >
-                  {plan.description}
-                </p>
-              </div>
+        {/* Error */}
+        {(error || plansError) && (
+          <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2.5 max-w-md mx-auto">
+            <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+            <p className="text-sm text-red-700 text-center">
+              {error || "Gagal memuat daftar plan. Coba refresh halaman."}
+            </p>
+          </div>
+        )}
+
+        {/* Plans Loading */}
+        {plansLoading && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
               <div
-                className={`text-xs space-y-1 ${i === 1 ? "text-zinc-300" : "text-zinc-500"}`}
+                key={i}
+                className="border border-zinc-200 rounded-xl p-6 space-y-5 animate-pulse"
               >
-                <p>✓ Maksimal {plan.max_kiosks} kiosk aktif</p>
-                <p>✓ Template tidak terbatas</p>
-                <p>✓ Semua metode pembayaran</p>
+                <div className="space-y-2">
+                  <div className="h-3 w-16 bg-zinc-200 rounded" />
+                  <div className="h-7 w-32 bg-zinc-200 rounded" />
+                  <div className="h-3 w-40 bg-zinc-100 rounded" />
+                </div>
+                <div className="space-y-1.5">
+                  <div className="h-3 w-36 bg-zinc-100 rounded" />
+                  <div className="h-3 w-32 bg-zinc-100 rounded" />
+                  <div className="h-3 w-36 bg-zinc-100 rounded" />
+                </div>
+                <div className="h-9 w-full bg-zinc-200 rounded" />
               </div>
-              <Button
-                className={`w-full text-sm ${i === 1
-                    ? "bg-white text-zinc-950 hover:bg-zinc-100"
-                    : "bg-zinc-950 text-white hover:bg-zinc-800"
+            ))}
+          </div>
+        )}
+
+        {/* Plans Grid */}
+        {!plansLoading && plans.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {plans.map((plan, i) => {
+              const price =
+                billingPeriod === "MONTHLY"
+                  ? plan.priceMonthly
+                  : plan.priceYearly;
+              const priceLabel = billingPeriod === "MONTHLY" ? "/bln" : "/thn";
+              const isHighlighted = i === 1;
+              const isCurrentlySubmitting =
+                subscriptionMutation.isPending && selectedPlanId === plan.id;
+
+              return (
+                <div
+                  key={plan.id}
+                  className={`border rounded-xl p-6 space-y-5 transition ${
+                    isHighlighted
+                      ? "border-zinc-950 bg-zinc-950 text-white"
+                      : "border-zinc-200 bg-white text-zinc-950 hover:border-zinc-400"
                   }`}
-                asChild
-              >
-                <a href="/">Pilih {plan.name}</a>
-              </Button>
-            </div>
-          ))}
-        </div>
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400">
+                        {plan.name}
+                      </p>
+                      {isHighlighted && (
+                        <Badge className="text-[10px] bg-white text-zinc-950 hover:bg-white">
+                          Populer
+                        </Badge>
+                      )}
+                    </div>
+                    <p
+                      className={`text-2xl font-semibold ${
+                        isHighlighted ? "text-white" : "text-zinc-950"
+                      }`}
+                    >
+                      {formatRupiah(price)}
+                      <span className="text-sm font-normal text-zinc-400">
+                        {priceLabel}
+                      </span>
+                    </p>
+                    <p
+                      className={`text-xs ${
+                        isHighlighted ? "text-zinc-400" : "text-zinc-500"
+                      }`}
+                    >
+                      {plan.description}
+                    </p>
+                  </div>
+                  <div
+                    className={`text-xs space-y-1 ${
+                      isHighlighted ? "text-zinc-300" : "text-zinc-500"
+                    }`}
+                  >
+                    <p>✓ Maksimal {plan.maxKiosks} kiosk aktif</p>
+                    <p>✓ Template tidak terbatas</p>
+                    <p>✓ Semua metode pembayaran</p>
+                  </div>
+                  <Button
+                    onClick={() => handleSelectPlan(plan.id)}
+                    disabled={subscriptionMutation.isPending}
+                    className={`w-full text-sm ${
+                      isHighlighted
+                        ? "bg-white text-zinc-950 hover:bg-zinc-100"
+                        : "bg-zinc-950 text-white hover:bg-zinc-800"
+                    }`}
+                  >
+                    {isCurrentlySubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Memproses...
+                      </>
+                    ) : (
+                      `Pilih ${plan.name}`
+                    )}
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Empty state — plans loaded but none active */}
+        {!plansLoading && plans.length === 0 && !plansError && (
+          <div className="text-center py-8">
+            <p className="text-sm text-zinc-500">
+              Belum ada plan yang tersedia. Hubungi tim memoir.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

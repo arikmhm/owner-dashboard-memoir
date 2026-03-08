@@ -1,0 +1,254 @@
+{
+  "info": {
+    "name": "Memoir API — Owner Subscription",
+    "_postman_id": "epic-05-owner-subscription",
+    "description": "EPIC-05: Owner Subscription — Select/Upgrade Plan & Invoice/Payment Check",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api/v1"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "planId",
+      "value": ""
+    },
+    {
+      "key": "invoiceId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Plans",
+      "item": [
+        {
+          "name": "GET /owner/subscription/plans — List Active Plans",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/owner/subscription/plans",
+              "host": ["{{baseUrl}}"],
+              "path": ["owner", "subscription", "plans"]
+            },
+            "description": "List all active subscription plans available for owner to choose from."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Subscription",
+      "item": [
+        {
+          "name": "GET /owner/subscription — Get Current",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/owner/subscription",
+              "host": ["{{baseUrl}}"],
+              "path": ["owner", "subscription"]
+            },
+            "description": "Fetch owner's current subscription with computed status (lazy computation)."
+          }
+        },
+        {
+          "name": "POST /owner/subscription — New Monthly",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"planId\": \"{{planId}}\",\n  \"billingPeriod\": \"MONTHLY\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/owner/subscription",
+              "host": ["{{baseUrl}}"],
+              "path": ["owner", "subscription"]
+            },
+            "description": "Create a new monthly subscription. Returns PENDING_PAYMENT status."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body.data && body.data.invoice) {",
+                  "  pm.collectionVariables.set('invoiceId', body.data.invoice.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /owner/subscription — New Yearly",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"planId\": \"{{planId}}\",\n  \"billingPeriod\": \"YEARLY\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/owner/subscription",
+              "host": ["{{baseUrl}}"],
+              "path": ["owner", "subscription"]
+            },
+            "description": "Create a new yearly subscription."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body.data && body.data.invoice) {",
+                  "  pm.collectionVariables.set('invoiceId', body.data.invoice.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /owner/subscription — Upgrade Plan",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"planId\": \"<new-plan-uuid>\",\n  \"billingPeriod\": \"MONTHLY\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/owner/subscription",
+              "host": ["{{baseUrl}}"],
+              "path": ["owner", "subscription"]
+            },
+            "description": "Upgrade existing active subscription to different plan. Previous plan stored in previousPlanId."
+          }
+        },
+        {
+          "name": "POST /owner/subscription — Duplicate (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"planId\": \"{{planId}}\",\n  \"billingPeriod\": \"MONTHLY\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/owner/subscription",
+              "host": ["{{baseUrl}}"],
+              "path": ["owner", "subscription"]
+            },
+            "description": "Re-subscribe to same plan+period when already ACTIVE — expect 409 Conflict."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Invoices",
+      "item": [
+        {
+          "name": "GET /owner/subscription/invoices — Default",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/owner/subscription/invoices",
+              "host": ["{{baseUrl}}"],
+              "path": ["owner", "subscription", "invoices"]
+            },
+            "description": "Fetch subscription invoices with default pagination (page=1, limit=20)."
+          }
+        },
+        {
+          "name": "GET /owner/subscription/invoices — Paginated",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/owner/subscription/invoices?page=1&limit=5",
+              "host": ["{{baseUrl}}"],
+              "path": ["owner", "subscription", "invoices"],
+              "query": [{ "key": "page", "value": "1" }, { "key": "limit", "value": "5" }]
+            },
+            "description": "Fetch subscription invoices with custom pagination."
+          }
+        },
+        {
+          "name": "POST /owner/subscription/invoices/:id/check-payment",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/owner/subscription/invoices/{{invoiceId}}/check-payment",
+              "host": ["{{baseUrl}}"],
+              "path": ["owner", "subscription", "invoices", "{{invoiceId}}", "check-payment"]
+            },
+            "description": "Check payment status for a subscription invoice. Returns PAID, PENDING, or FAILED."
+          }
+        },
+        {
+          "name": "POST /owner/subscription/invoices/:id/check-payment — Not Found (404)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/owner/subscription/invoices/00000000-0000-0000-0000-000000000000/check-payment",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "owner",
+                "subscription",
+                "invoices",
+                "00000000-0000-0000-0000-000000000000",
+                "check-payment"
+              ]
+            },
+            "description": "Check payment for non-existent invoice — expect 404."
+          }
+        }
+      ]
+    }
+  ]
+}

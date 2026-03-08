@@ -1,11 +1,34 @@
+"use client";
+
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import { useAuth } from "@/components/auth-provider";
+import { Loader2 } from "lucide-react";
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const { isLoading, isAuthenticated } = useAuth();
+
+  // Show loading spinner while auth state is being resolved
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-zinc-50">
+        <Loader2
+          className="h-5 w-5 animate-spin text-zinc-400"
+          aria-label="Memuat..."
+        />
+      </div>
+    );
+  }
+
+  // AuthProvider will handle redirect to /login if not authenticated
+  if (!isAuthenticated) {
+    return null;
+  }
+
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full bg-zinc-50">

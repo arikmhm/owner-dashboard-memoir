@@ -11,6 +11,7 @@ import {
   CreditCard,
   ChevronLeft,
   ChevronRight,
+  LogOut,
 } from "lucide-react";
 import {
   Sidebar,
@@ -26,7 +27,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
-import { dummyOwner, dummySubscription, dummyPlans } from "@/lib/dummy-data";
+import { useAuth } from "@/components/auth-provider";
 
 function SidebarToggle() {
   const { open, toggleSidebar } = useSidebar();
@@ -56,6 +57,12 @@ const NAV_ITEMS = [
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const { user, subscription, logout } = useAuth();
+
+  // Derive display info from auth context
+  const displayName = user?.email?.split("@")[0] ?? "owner";
+  const initials = displayName.slice(0, 2).toUpperCase();
+  const planName = subscription?.plan?.name ?? "—";
 
   return (
     <Sidebar collapsible="icon">
@@ -114,23 +121,30 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      {/* Footer — Owner info */}
+      {/* Footer — Owner info + Logout */}
       <SidebarFooter className="px-3 py-3">
         <Separator className="mb-3" />
         <div className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
           <Avatar className="h-7 w-7 shrink-0">
             <AvatarFallback className="bg-zinc-200 text-zinc-700 text-xs font-medium">
-              {dummyOwner._initials}
+              {initials}
             </AvatarFallback>
           </Avatar>
           <div className="flex flex-col min-w-0 group-data-[collapsible=icon]:hidden">
             <span className="text-xs font-medium text-zinc-900 truncate">
-              {dummyOwner._display_name}
+              {displayName}
             </span>
             <span className="text-[10px] text-zinc-400 truncate">
-              Plan {dummyPlans.find((p) => p.id === dummySubscription.plan_id)?.name}
+              Plan {planName}
             </span>
           </div>
+          <button
+            onClick={logout}
+            className="ml-auto shrink-0 text-zinc-400 hover:text-zinc-700 transition-colors group-data-[collapsible=icon]:hidden"
+            title="Keluar"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
         </div>
       </SidebarFooter>
     </Sidebar>

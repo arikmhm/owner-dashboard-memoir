@@ -1,4 +1,9 @@
-import type { TxStatus, WithdrawalStatus, BillingPeriod } from "./dummy-data";
+import type {
+  TxStatus,
+  WithdrawalStatus,
+  BillingPeriod,
+  SubscriptionStatus,
+} from "./types";
 
 type InvoiceStatus = TxStatus; // invoices use same status enum
 
@@ -32,6 +37,23 @@ export const INVOICE_STATUS_CONFIG: Record<
   PAID: { label: "Lunas", className: "bg-zinc-950 text-white" },
   PENDING: { label: "Menunggu", className: "bg-zinc-100 text-zinc-500" },
   FAILED: { label: "Gagal", className: "bg-zinc-100 text-zinc-400" },
+};
+
+export const SUBSCRIPTION_STATUS_CONFIG: Record<
+  SubscriptionStatus,
+  { label: string; className: string }
+> = {
+  ACTIVE: { label: "Aktif", className: "bg-emerald-100 text-emerald-700" },
+  PENDING_PAYMENT: {
+    label: "Menunggu Pembayaran",
+    className: "bg-yellow-100 text-yellow-700",
+  },
+  GRACE_PERIOD: {
+    label: "Masa Tenggang",
+    className: "bg-yellow-100 text-yellow-700",
+  },
+  EXPIRED: { label: "Expired", className: "bg-red-100 text-red-700" },
+  CANCELLED: { label: "Dibatalkan", className: "bg-zinc-100 text-zinc-400" },
 };
 
 export const BILLING_PERIOD_LABEL: Record<BillingPeriod, string> = {

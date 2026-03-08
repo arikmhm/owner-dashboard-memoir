@@ -1,0 +1,319 @@
+"use client";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// memoir. — Auth Context Provider
+// Provides auth state (user, subscription) to the entire app.
+// Routes: /login (public), /onboarding (auth-only, no subscription needed),
+//         everything else (auth + active subscription required).
+// ─────────────────────────────────────────────────────────────────────────────
+
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  type ReactNode,
+} from "react";
+import { useRouter, usePathname } from "next/navigation";
+import { getToken, removeToken } from "@/lib/api";
+import {
+  login as apiLogin,
+  logout as apiLogout,
+  getSubscription,
+} from "@/lib/auth-api";
+import type {
+  AuthUser,
+  LoginRequest,
+  Subscription,
+  SubscriptionStatus,
+} from "@/lib/types";
+
+// ── Context types ────────────────────────────────────────────────────────────
+
+interface AuthState {
+  user: AuthUser | null;
+  subscription: Subscription | null;
+  subscriptionStatus: SubscriptionStatus | null;
+  gracePeriodDaysRemaining: number;
+  /** PENDING_PAYMENT subscription for in-flight upgrade; null if none */
+  pendingUpgrade: Subscription | null;
+  isLoading: boolean;
+  isAuthenticated: boolean;
+}
+
+interface AuthActions {
+  login: (credentials: LoginRequest) => Promise<void>;
+  logout: () => void;
+  refreshSubscription: () => Promise<void>;
+}
+
+type AuthContextType = AuthState & AuthActions;
+
+const AuthContext = createContext<AuthContextType | null>(null);
+
+// ── Helper: decode JWT payload (without verification — just for reading) ─────
+
+function decodeTokenPayload(token: string): AuthUser | null {
+  try {
+    const base64Url = token.split(".")[1];
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const payload = JSON.parse(atob(base64));
+    return {
+      id: payload.id ?? payload.sub,
+      email: payload.email ?? "",
+      role: payload.role,
+      name: payload.name ?? undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ── Route classification ─────────────────────────────────────────────────────
+
+/** Routes that don't require any authentication */
+const PUBLIC_ROUTES = ["/login"];
+
+/** Routes that require auth but NOT an active subscription */
+const AUTH_ONLY_ROUTES = ["/onboarding"];
+
+function isPublicRoute(pathname: string): boolean {
+  return PUBLIC_ROUTES.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`),
+  );
+}
+
+function isAuthOnlyRoute(pathname: string): boolean {
+  return AUTH_ONLY_ROUTES.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`),
+  );
+}
+
+/** Check if subscription status allows access to dashboard */
+function hasActiveSubscription(status: SubscriptionStatus | null): boolean {
+  return status === "ACTIVE" || status === "GRACE_PERIOD";
+}
+
+/** Check if subscription needs onboarding (no sub, expired, pending payment) */
+function needsOnboarding(status: SubscriptionStatus | null): boolean {
+  return (
+    status === null ||
+    status === "EXPIRED" ||
+    status === "CANCELLED" ||
+    status === "PENDING_PAYMENT"
+  );
+}
+
+// ── Provider component ───────────────────────────────────────────────────────
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [subscriptionStatus, setSubscriptionStatus] =
+    useState<SubscriptionStatus | null>(null);
+  const [gracePeriodDaysRemaining, setGracePeriodDaysRemaining] = useState(0);
+  const [pendingUpgrade, setPendingUpgrade] = useState<Subscription | null>(
+    null,
+  );
+  const [isLoading, setIsLoading] = useState(true);
+
+  const isAuthenticated = !!user;
+
+  // ── Initialize: check token on mount ─────────────────────────────────────
+
+  useEffect(() => {
+    async function init() {
+      const token = getToken();
+
+      if (!token) {
+        setIsLoading(false);
+        if (!isPublicRoute(pathname)) {
+          router.replace("/login");
+        }
+        return;
+      }
+
+      // Decode user from token
+      const decoded = decodeTokenPayload(token);
+      if (!decoded) {
+        removeToken();
+        setIsLoading(false);
+        if (!isPublicRoute(pathname)) {
+          router.replace("/login");
+        }
+        return;
+      }
+
+      setUser(decoded);
+
+      // Fetch subscription status
+      try {
+        const subResponse = await getSubscription();
+        if (subResponse) {
+          setSubscription(subResponse.subscription);
+          setSubscriptionStatus(subResponse.subscriptionStatus);
+          setGracePeriodDaysRemaining(
+            subResponse.gracePeriodDaysRemaining ?? 0,
+          );
+          setPendingUpgrade(subResponse.pendingUpgrade ?? null);
+        }
+      } catch {
+        // Subscription fetch failure is non-blocking
+        setSubscription(null);
+        setSubscriptionStatus(null);
+        setPendingUpgrade(null);
+      }
+
+      setIsLoading(false);
+    }
+
+    init();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Route protection ─────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (isLoading) return;
+
+    // 1. Not authenticated + not on public route → redirect to login
+    if (!isAuthenticated && !isPublicRoute(pathname)) {
+      router.replace("/login");
+      return;
+    }
+
+    // 2. Authenticated + on login page → redirect based on subscription
+    if (isAuthenticated && pathname === "/login") {
+      if (hasActiveSubscription(subscriptionStatus)) {
+        router.replace("/");
+      } else {
+        router.replace("/onboarding");
+      }
+      return;
+    }
+
+    // 3. Authenticated + on dashboard route (not auth-only) + no active subscription
+    //    → redirect to onboarding
+    if (
+      isAuthenticated &&
+      !isPublicRoute(pathname) &&
+      !isAuthOnlyRoute(pathname) &&
+      !hasActiveSubscription(subscriptionStatus)
+    ) {
+      router.replace("/onboarding");
+      return;
+    }
+
+    // 4. Authenticated + on onboarding + HAS active subscription
+    //    → redirect to dashboard (no need to onboard again)
+    //    EXCEPT when returning from payment gateway (invoice_id in URL)
+    if (
+      isAuthenticated &&
+      isAuthOnlyRoute(pathname) &&
+      hasActiveSubscription(subscriptionStatus)
+    ) {
+      const hasInvoiceParam =
+        typeof window !== "undefined" &&
+        new URLSearchParams(window.location.search).has("invoice_id");
+      if (!hasInvoiceParam) {
+        router.replace("/");
+        return;
+      }
+    }
+  }, [isLoading, isAuthenticated, subscriptionStatus, pathname, router]);
+
+  // ── Actions ──────────────────────────────────────────────────────────────
+
+  const handleLogin = useCallback(
+    async (credentials: LoginRequest) => {
+      const { user: authUser } = await apiLogin(credentials);
+      setUser(authUser);
+
+      // Fetch subscription after login to determine redirect
+      let subStatus: SubscriptionStatus | null = null;
+      try {
+        const subResponse = await getSubscription();
+        if (subResponse) {
+          setSubscription(subResponse.subscription);
+          setSubscriptionStatus(subResponse.subscriptionStatus);
+          setGracePeriodDaysRemaining(
+            subResponse.gracePeriodDaysRemaining ?? 0,
+          );
+          setPendingUpgrade(subResponse.pendingUpgrade ?? null);
+          subStatus = subResponse.subscriptionStatus;
+        }
+      } catch {
+        // Non-blocking — treat as no subscription
+      }
+
+      // Redirect based on subscription status
+      if (hasActiveSubscription(subStatus)) {
+        router.replace("/");
+      } else {
+        router.replace("/onboarding");
+      }
+    },
+    [router],
+  );
+
+  const handleLogout = useCallback(() => {
+    setUser(null);
+    setSubscription(null);
+    setSubscriptionStatus(null);
+    setGracePeriodDaysRemaining(0);
+    setPendingUpgrade(null);
+    // apiLogout is async but we don't need to wait — it handles redirect
+    apiLogout();
+  }, []);
+
+  const refreshSubscription = useCallback(async () => {
+    try {
+      const subResponse = await getSubscription();
+      if (subResponse) {
+        setSubscription(subResponse.subscription);
+        setSubscriptionStatus(subResponse.subscriptionStatus);
+        setGracePeriodDaysRemaining(subResponse.gracePeriodDaysRemaining ?? 0);
+        setPendingUpgrade(subResponse.pendingUpgrade ?? null);
+      } else {
+        setSubscription(null);
+        setSubscriptionStatus(null);
+        setPendingUpgrade(null);
+      }
+    } catch {
+      setSubscription(null);
+      setSubscriptionStatus(null);
+      setPendingUpgrade(null);
+    }
+  }, []);
+
+  // ── Context value ────────────────────────────────────────────────────────
+
+  const value: AuthContextType = {
+    user,
+    subscription,
+    subscriptionStatus,
+    gracePeriodDaysRemaining,
+    pendingUpgrade,
+    isLoading,
+    isAuthenticated,
+    login: handleLogin,
+    logout: handleLogout,
+    refreshSubscription,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+// ── Hook ─────────────────────────────────────────────────────────────────────
+
+export function useAuth(): AuthContextType {
+  const ctx = useContext(AuthContext);
+  if (!ctx) {
+    throw new Error("useAuth must be used within AuthProvider");
+  }
+  return ctx;
+}

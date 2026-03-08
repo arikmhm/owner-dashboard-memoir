@@ -1,6 +1,6 @@
 // =============================================================
 // PROJECT: memoir. — Receipt Photobooth SaaS
-// Schema v2 — February 2026
+// Schema v3 — March 2026
 // Model: Tiered Subscription per Owner + Withdrawal Flow
 // =============================================================
 
@@ -78,7 +78,22 @@ Table users as U {
 }
 
 // -------------------------------------------------------------
-// 2. SUBSCRIPTION PLANS (Tier)
+// 2. REFRESH TOKENS (Auth)
+// -------------------------------------------------------------
+
+Table refresh_tokens as RT {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null]
+  token_hash varchar [unique, not null, note: "SHA-256 hash of the raw refresh token"]
+  is_revoked boolean [not null, default: false]
+  expires_at timestamptz [not null, note: "Default 7 hari dari saat login"]
+  created_at timestamptz [not null, default: `now()`]
+
+  Note: "Server-stored refresh token. Raw token dikirim via HttpOnly cookie. Hanya hash yang disimpan di DB."
+}
+
+// -------------------------------------------------------------
+// 3. SUBSCRIPTION PLANS (Tier)
 // -------------------------------------------------------------
 
 Table subscription_plans as SP {
@@ -176,6 +191,7 @@ Table kiosks as K {
   name varchar [not null]
 
   pairing_code varchar [unique, note: "6 digit. Null setelah paired."]
+  pairing_code_expires_at timestamptz [note: "Expiry pairing code. Default 7 hari dari generate."]
   device_token varchar [unique, note: "Token permanen Electron app."]
   paired_at timestamptz
   is_active boolean [not null, default: true]
@@ -343,6 +359,7 @@ Ref: U.id < SUB.user_id
 Ref: U.id < SI.user_id
 Ref: U.id < W.user_id
 Ref: U.id < W.processed_by
+Ref: U.id < RT.user_id
 
 // Subscription
 Ref: SP.id < SUB.plan_id
@@ -362,5 +379,7 @@ Ref: TX.id - S.transaction_id
 
 // Wallet
 Ref: TX.id < WM.transaction_ref_id
-Ref: W.id < WM.withdrawal_ref_id
-Ref: WM.id - W.wallet_mutation_id
+// Note: withdrawal_ref_id dan wallet_mutation_id di-enforce di application layer,
+// bukan sebagai DB-level FK (menghindari circular dependency saat atomic approve flow)
+Ref: W.id < WM.withdrawal_ref_id  [note: "Application-enforced, no DB FK"]
+Ref: WM.id - W.wallet_mutation_id  [note: "Application-enforced, no DB FK"]

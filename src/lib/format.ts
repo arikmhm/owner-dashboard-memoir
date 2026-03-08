@@ -21,7 +21,7 @@ export function formatDate(
 }
 
 export function formatDateTime(isoString: string): string {
-  return new Date(isoString).toLocaleDateString("id-ID", {
+  return new Date(isoString).toLocaleString("id-ID", {
     day: "numeric",
     month: "short",
     hour: "2-digit",

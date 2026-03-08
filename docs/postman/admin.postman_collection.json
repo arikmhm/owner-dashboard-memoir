@@ -1,0 +1,381 @@
+{
+  "info": {
+    "name": "Memoir API — Admin Platform",
+    "_postman_id": "epic-06-admin-platform",
+    "description": "EPIC-06: Admin Platform — Owners, Plans, Config, Withdrawals & Transactions management",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api/v1"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "ownerId",
+      "value": ""
+    },
+    {
+      "key": "planId",
+      "value": ""
+    },
+    {
+      "key": "configId",
+      "value": ""
+    },
+    {
+      "key": "withdrawalId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Owners",
+      "item": [
+        {
+          "name": "GET /admin/owners — List Active",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/owners",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "owners"]
+            },
+            "description": "List all active studio owners."
+          }
+        },
+        {
+          "name": "GET /admin/owners — Include Deleted",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/owners?includeDeleted=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "owners"],
+              "query": [{ "key": "includeDeleted", "value": "true" }]
+            },
+            "description": "List all studio owners including soft-deleted ones."
+          }
+        },
+        {
+          "name": "POST /admin/owners — Create",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"newowner@studio.com\",\n  \"password\": \"securePass123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/owners",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "owners"]
+            },
+            "description": "Create a new studio owner account."
+          }
+        },
+        {
+          "name": "PATCH /admin/owners/:id — Update Email",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"updated@studio.com\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/owners/{{ownerId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "owners", "{{ownerId}}"]
+            },
+            "description": "Update owner email address."
+          }
+        },
+        {
+          "name": "PATCH /admin/owners/:id — Soft Delete",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isActive\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/owners/{{ownerId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "owners", "{{ownerId}}"]
+            },
+            "description": "Soft-delete an owner."
+          }
+        },
+        {
+          "name": "PATCH /admin/owners/:id — Restore",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/owners/{{ownerId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "owners", "{{ownerId}}"]
+            },
+            "description": "Restore a soft-deleted owner."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Subscription Plans",
+      "item": [
+        {
+          "name": "GET /admin/subscription-plans — List",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/subscription-plans",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "subscription-plans"]
+            },
+            "description": "List all subscription plans."
+          }
+        },
+        {
+          "name": "POST /admin/subscription-plans — Create",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Pro\",\n  \"description\": \"Professional plan\",\n  \"maxKiosks\": 10,\n  \"priceMonthly\": 199000,\n  \"priceYearly\": 1999000\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/subscription-plans",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "subscription-plans"]
+            },
+            "description": "Create a new subscription plan."
+          }
+        },
+        {
+          "name": "PATCH /admin/subscription-plans/:id — Update",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Pro Plus\",\n  \"maxKiosks\": 15,\n  \"priceMonthly\": 249000\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/subscription-plans/{{planId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "subscription-plans", "{{planId}}"]
+            },
+            "description": "Update subscription plan fields."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Platform Config",
+      "item": [
+        {
+          "name": "GET /admin/platform-config — List",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/platform-config",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "platform-config"]
+            },
+            "description": "List all platform configuration items."
+          }
+        },
+        {
+          "name": "PATCH /admin/platform-config/:id — Update",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"value\": \"14\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/platform-config/{{configId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "platform-config", "{{configId}}"]
+            },
+            "description": "Update a platform config value."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Withdrawals",
+      "item": [
+        {
+          "name": "GET /admin/withdrawals — List All",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/withdrawals",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "withdrawals"]
+            },
+            "description": "List all withdrawals with default pagination."
+          }
+        },
+        {
+          "name": "GET /admin/withdrawals — Filter PENDING",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/withdrawals?status=PENDING&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "withdrawals"],
+              "query": [
+                { "key": "status", "value": "PENDING" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            },
+            "description": "List pending withdrawals."
+          }
+        },
+        {
+          "name": "POST /admin/withdrawals/:id/approve",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/withdrawals/{{withdrawalId}}/approve",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "withdrawals", "{{withdrawalId}}", "approve"]
+            },
+            "description": "Approve a pending withdrawal. Atomically debits wallet and updates status."
+          }
+        },
+        {
+          "name": "POST /admin/withdrawals/:id/reject",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rejectionNote\": \"Nomor rekening tidak valid\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/withdrawals/{{withdrawalId}}/reject",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "withdrawals", "{{withdrawalId}}", "reject"]
+            },
+            "description": "Reject a pending withdrawal with a rejection note."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Transactions",
+      "item": [
+        {
+          "name": "GET /admin/transactions — Default",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/transactions",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "transactions"]
+            },
+            "description": "List all transactions with default pagination."
+          }
+        },
+        {
+          "name": "GET /admin/transactions — With Filters",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/transactions?status=PAID&paymentMethod=CASH&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "transactions"],
+              "query": [
+                { "key": "status", "value": "PAID" },
+                { "key": "paymentMethod", "value": "CASH" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            },
+            "description": "List paid cash transactions."
+          }
+        },
+        {
+          "name": "GET /admin/transactions — Date Range",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/transactions?startDate=2024-01-01T00:00:00Z&endDate=2024-02-01T00:00:00Z",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "transactions"],
+              "query": [
+                { "key": "startDate", "value": "2024-01-01T00:00:00Z" },
+                { "key": "endDate", "value": "2024-02-01T00:00:00Z" }
+              ]
+            },
+            "description": "List transactions in January 2024."
+          }
+        },
+        {
+          "name": "GET /admin/transactions — Search",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/transactions?search=MEM-123",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "transactions"],
+              "query": [{ "key": "search", "value": "MEM-123" }]
+            },
+            "description": "Search transactions by orderId."
+          }
+        },
+        {
+          "name": "GET /admin/transactions — By Owner",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/transactions?ownerId={{ownerId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "transactions"],
+              "query": [{ "key": "ownerId", "value": "{{ownerId}}" }]
+            },
+            "description": "List transactions for a specific owner."
+          }
+        }
+      ]
+    }
+  ]
+}
