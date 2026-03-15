@@ -144,8 +144,14 @@ export default function SubscriptionPage() {
         if (result.invoice.paymentUrl) {
           window.location.href = result.invoice.paymentUrl;
         } else {
-          toast.success("Subscription berhasil dibuat!");
           setUpgradeOpen(false);
+          if (result.invoice.qrString) {
+            toast("Scan QR code di bawah untuk menyelesaikan pembayaran.", {
+              icon: <CreditCard className="size-4 text-zinc-500" />,
+            });
+          } else {
+            toast.success("Subscription berhasil dibuat!");
+          }
           await refreshSubscription();
           refreshInvoices();
         }
@@ -286,7 +292,16 @@ export default function SubscriptionPage() {
                       <p className="font-medium text-zinc-900">
                         {formatDate(subscription.currentPeriodEnd)}
                         {daysLeft !== null && (
-                          <span className="text-zinc-400 ml-1">
+                          <span
+                            className={cn(
+                              "ml-1",
+                              daysLeft < 3
+                                ? "text-red-600 font-medium"
+                                : daysLeft < 7
+                                  ? "text-yellow-600 font-medium"
+                                  : "text-zinc-400",
+                            )}
+                          >
                             ({daysLeft} hari lagi)
                           </span>
                         )}
