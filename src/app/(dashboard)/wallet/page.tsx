@@ -171,11 +171,12 @@ export default function WalletPage() {
     const amount = Number(withdrawalForm.amount);
     return (
       amount > 0 &&
+      amount <= balance &&
       withdrawalForm.bankName.trim().length > 0 &&
       withdrawalForm.bankAccountNumber.trim().length > 0 &&
       withdrawalForm.bankAccountName.trim().length > 0
     );
-  }, [withdrawalForm]);
+  }, [withdrawalForm, balance]);
 
   // ── Render ─────────────────────────────────────────────────────────────
   return (
@@ -226,7 +227,7 @@ export default function WalletPage() {
             size="sm"
             className="bg-zinc-950 text-white hover:bg-zinc-800"
             onClick={handleOpenWithdrawal}
-            disabled={hasPending}
+            disabled={balance === 0 || hasPending}
           >
             <Download className="h-3.5 w-3.5 mr-1" />
             Request Withdrawal
