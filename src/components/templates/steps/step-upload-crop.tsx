@@ -18,6 +18,7 @@ const CROP_ASPECT = 2 / 3;
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const OUTPUT_WIDTH = 576;
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 export interface CroppedImageData {
@@ -75,13 +76,22 @@ export function StepUploadCrop({ onNext, initialImage }: StepUploadCropProps) {
     );
     const replaceInputRef = useRef<HTMLInputElement | null>(null);
     const [isDragging, setIsDragging] = useState(false);
+    const [fileError, setFileError] = useState<string | null>(null);
 
     const imgRef = useRef<HTMLImageElement | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
 
     // ── File reader ──
     const loadFile = useCallback((file: File) => {
-        if (!file.type.startsWith("image/")) return;
+        setFileError(null);
+        if (!file.type.startsWith("image/")) {
+            setFileError("Format file tidak didukung. Gunakan PNG, JPG, atau WEBP.");
+            return;
+        }
+        if (file.size > MAX_FILE_SIZE) {
+            setFileError("Ukuran file maksimal 5 MB.");
+            return;
+        }
         const reader = new FileReader();
         reader.onload = () => {
             setImageSrc(reader.result as string);
@@ -154,8 +164,11 @@ export function StepUploadCrop({ onNext, initialImage }: StepUploadCropProps) {
                         <p className="text-sm font-medium text-zinc-700">
                             Klik atau seret gambar ke sini
                         </p>
-                        <p className="text-xs text-zinc-400">PNG, JPG, WEBP</p>
+                        <p className="text-xs text-zinc-400">PNG, JPG, WEBP · Maks. 5 MB</p>
                     </div>
+                    {fileError && (
+                        <p className="text-xs text-red-600 font-medium">{fileError}</p>
+                    )}
                     <input
                         ref={fileInputRef}
                         type="file"

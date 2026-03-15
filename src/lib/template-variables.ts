@@ -26,6 +26,11 @@ export const TEMPLATE_VARIABLES: TemplateVariable[] = [
     { key: "template_name", label: "Nama Template", category: "Kiosk", example: "Classic Stripe" },
     { key: "owner_name", label: "Nama Studio", category: "Kiosk", example: "Memoir Studio" },
     { key: "session_number", label: "No. Sesi", category: "Kiosk", example: "#042" },
+
+    // Pelanggan
+    { key: "customer_name", label: "Nama Pelanggan", category: "Pelanggan", example: "Budi Santoso" },
+    { key: "customer_phone", label: "No. HP Pelanggan", category: "Pelanggan", example: "081234567890" },
+    { key: "customer_email", label: "Email Pelanggan", category: "Pelanggan", example: "budi@email.com" },
 ];
 
 // ── Dummy context for editor preview ────────────────────────────────────────────
