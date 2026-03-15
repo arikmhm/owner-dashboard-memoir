@@ -4,7 +4,8 @@ import { Suspense, useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/components/auth-provider";
-import { formatRupiah } from "@/lib/format";
+import { formatRupiah, formatDateTime } from "@/lib/format";
+import { QRCodeSVG } from "qrcode.react";
 import {
   createSubscription,
   checkPaymentStatus,
@@ -56,6 +57,8 @@ function OnboardingContent() {
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pendingInvoiceId, setPendingInvoiceId] = useState<string | null>(null);
+  const [pendingQrString, setPendingQrString] = useState<string | null>(null);
+  const [pendingExpiresAt, setPendingExpiresAt] = useState<string | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<
     "idle" | "checking" | "paid" | "not-paid" | "failed"
   >("idle");
@@ -84,8 +87,10 @@ function OnboardingContent() {
         // /onboarding?invoice_id=<UUID> after payment
         window.location.href = result.invoice.paymentUrl;
       } else {
-        // No payment URL — stay on page, set invoice ID for checking
+        // No payment URL — stay on page (QRIS: display QR code inline)
         setPendingInvoiceId(result.invoice.id);
+        setPendingQrString(result.invoice.qrString ?? null);
+        setPendingExpiresAt(result.invoice.paymentExpiresAt ?? null);
         setStep("checking-payment");
       }
     },
@@ -175,6 +180,8 @@ function OnboardingContent() {
   const handleBackToPlans = useCallback(() => {
     setStep("select-plan");
     setPendingInvoiceId(null);
+    setPendingQrString(null);
+    setPendingExpiresAt(null);
     setPaymentStatus("idle");
     setError(null);
     autoCheckTriggered.current = false;
@@ -223,6 +230,29 @@ function OnboardingContent() {
               memverifikasi.
             </p>
           </div>
+
+          {/* QRIS QR Code display */}
+          {pendingQrString &&
+            paymentStatus !== "paid" &&
+            paymentStatus !== "failed" && (
+              <div className="space-y-3">
+                <div className="inline-flex rounded-xl border border-zinc-200 bg-white p-4">
+                  <QRCodeSVG value={pendingQrString} size={200} level="M" />
+                </div>
+                <p className="text-xs text-zinc-500">
+                  Scan QR code di atas menggunakan aplikasi e-wallet atau mobile
+                  banking Anda.
+                </p>
+                {pendingExpiresAt && (
+                  <p className="text-xs text-zinc-400">
+                    Bayar sebelum{" "}
+                    <span className="font-medium text-zinc-600">
+                      {formatDateTime(pendingExpiresAt)}
+                    </span>
+                  </p>
+                )}
+              </div>
+            )}
 
           {/* Status display */}
           <div className="space-y-4">

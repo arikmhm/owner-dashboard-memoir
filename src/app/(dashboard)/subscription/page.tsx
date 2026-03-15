@@ -15,8 +15,6 @@ import {
   ChevronRight,
   RefreshCw,
   Loader2,
-  CheckCircle2,
-  XCircle,
   ExternalLink,
   CreditCard,
   AlertCircle,
@@ -35,7 +33,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { formatRupiah, formatDate } from "@/lib/format";
+import { formatRupiah, formatDate, formatDateTime } from "@/lib/format";
+import { QRCodeSVG } from "qrcode.react";
 import {
   SUBSCRIPTION_STATUS_CONFIG,
   INVOICE_STATUS_CONFIG,
@@ -89,6 +88,8 @@ export default function SubscriptionPage() {
   const [checkingInvoiceId, setCheckingInvoiceId] = useState<string | null>(
     null,
   );
+  // ── QR code display state ─────────────────────────────────────────────
+  const [showQrInvoiceId, setShowQrInvoiceId] = useState<string | null>(null);
 
   // ── Derived ────────────────────────────────────────────────────────────
   const invoiceTotalPages = invoiceMeta
@@ -111,8 +112,7 @@ export default function SubscriptionPage() {
     return (
       invoices.find(
         (inv) =>
-          inv.subscriptionId === pendingUpgrade.id &&
-          inv.status === "PENDING",
+          inv.subscriptionId === pendingUpgrade.id && inv.status === "PENDING",
       ) ?? null
     );
   }, [pendingUpgrade, invoices]);
@@ -347,8 +347,8 @@ export default function SubscriptionPage() {
                   </p>
                   <p className="text-xs text-yellow-600">
                     {BILLING_PERIOD_LABEL[pendingUpgrade.billingPeriod]} ·{" "}
-                    {formatRupiah(pendingUpgrade.pricePaid)}/periode — Plan aktif
-                    saat ini tetap berjalan.
+                    {formatRupiah(pendingUpgrade.pricePaid)}/periode — Plan
+                    aktif saat ini tetap berjalan.
                   </p>
                 </div>
               </div>
@@ -356,6 +356,36 @@ export default function SubscriptionPage() {
                 Menunggu Pembayaran
               </Badge>
             </div>
+
+            {/* QRIS QR Code for pending upgrade */}
+            {pendingUpgradeInvoice?.qrString &&
+              !pendingUpgradeInvoice.paymentUrl && (
+                <div className="flex items-start gap-4 pt-1">
+                  <div className="rounded-lg border border-yellow-300 bg-white p-2">
+                    <QRCodeSVG
+                      value={pendingUpgradeInvoice.qrString}
+                      size={120}
+                      level="M"
+                    />
+                  </div>
+                  <div className="text-xs text-yellow-700 space-y-1">
+                    <p>
+                      Scan QR code untuk membayar via e-wallet atau mobile
+                      banking.
+                    </p>
+                    {pendingUpgradeInvoice.paymentExpiresAt && (
+                      <p className="text-yellow-600">
+                        Bayar sebelum{" "}
+                        <span className="font-medium">
+                          {formatDateTime(
+                            pendingUpgradeInvoice.paymentExpiresAt,
+                          )}
+                        </span>
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
 
             <div className="flex gap-2">
               {pendingUpgradeInvoice?.paymentUrl && (
@@ -378,9 +408,7 @@ export default function SubscriptionPage() {
                   variant="outline"
                   size="sm"
                   className="text-xs gap-1.5 border-yellow-300 text-yellow-800 hover:bg-yellow-100"
-                  onClick={() =>
-                    handleCheckPayment(pendingUpgradeInvoice.id)
-                  }
+                  onClick={() => handleCheckPayment(pendingUpgradeInvoice.id)}
                   disabled={checkingInvoiceId === pendingUpgradeInvoice.id}
                 >
                   {checkingInvoiceId === pendingUpgradeInvoice.id ? (
@@ -477,74 +505,116 @@ export default function SubscriptionPage() {
                   ];
                 const isChecking = checkingInvoiceId === inv.id;
 
+                const isQrVisible = showQrInvoiceId === inv.id;
+
                 return (
-                  <div
-                    key={inv.id}
-                    className="flex items-center justify-between px-5 py-3.5 hover:bg-zinc-50/50 transition-colors gap-4"
-                  >
-                    <div className="min-w-0 space-y-0.5">
-                      <p className="text-sm font-medium text-zinc-900 tabular-nums">
-                        {formatRupiah(inv.amount)}
-                      </p>
-                      <p className="text-xs text-zinc-400 truncate">
-                        {formatDate(inv.periodStart)} —{" "}
-                        {formatDate(inv.periodEnd)} ·{" "}
-                        {BILLING_PERIOD_LABEL[inv.billingPeriod]}
-                      </p>
-                      {inv.orderId && (
-                        <p className="text-[10px] font-mono text-zinc-400">
-                          {inv.orderId}
+                  <div key={inv.id}>
+                    <div className="flex items-center justify-between px-5 py-3.5 hover:bg-zinc-50/50 transition-colors gap-4">
+                      <div className="min-w-0 space-y-0.5">
+                        <p className="text-sm font-medium text-zinc-900 tabular-nums">
+                          {formatRupiah(inv.amount)}
                         </p>
-                      )}
-                    </div>
+                        <p className="text-xs text-zinc-400 truncate">
+                          {formatDate(inv.periodStart)} —{" "}
+                          {formatDate(inv.periodEnd)} ·{" "}
+                          {BILLING_PERIOD_LABEL[inv.billingPeriod]}
+                        </p>
+                        {inv.orderId && (
+                          <p className="text-[10px] font-mono text-zinc-400">
+                            {inv.orderId}
+                          </p>
+                        )}
+                      </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
-                      {inv.paidAt && (
-                        <span className="text-xs text-zinc-400 hidden sm:block">
-                          {formatDate(inv.paidAt)}
-                        </span>
-                      )}
+                      <div className="flex items-center gap-2 shrink-0">
+                        {inv.paidAt && (
+                          <span className="text-xs text-zinc-400 hidden sm:block">
+                            {formatDate(inv.paidAt)}
+                          </span>
+                        )}
 
-                      {/* Check payment button for PENDING invoices */}
-                      {inv.status === "PENDING" && (
-                        <div className="flex items-center gap-1.5">
-                          {inv.paymentUrl && (
-                            <a
-                              href={inv.paymentUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
+                        {/* Check payment button for PENDING invoices */}
+                        {inv.status === "PENDING" && (
+                          <div className="flex items-center gap-1.5">
+                            {inv.paymentUrl && (
+                              <a
+                                href={inv.paymentUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-6 text-[10px] gap-1 px-2"
+                                >
+                                  <ExternalLink className="size-2.5" />
+                                  Bayar
+                                </Button>
+                              </a>
+                            )}
+                            {inv.qrString && !inv.paymentUrl && (
                               <Button
                                 variant="outline"
                                 size="sm"
                                 className="h-6 text-[10px] gap-1 px-2"
+                                onClick={() =>
+                                  setShowQrInvoiceId(
+                                    isQrVisible ? null : inv.id,
+                                  )
+                                }
                               >
-                                <ExternalLink className="size-2.5" />
-                                Bayar
+                                {isQrVisible ? "Tutup QR" : "Lihat QR"}
                               </Button>
-                            </a>
-                          )}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-6 text-[10px] gap-1 px-2"
-                            onClick={() => handleCheckPayment(inv.id)}
-                            disabled={isChecking}
-                          >
-                            {isChecking ? (
-                              <Loader2 className="size-2.5 animate-spin" />
-                            ) : (
-                              <RefreshCw className="size-2.5" />
                             )}
-                            Cek
-                          </Button>
-                        </div>
-                      )}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-6 text-[10px] gap-1 px-2"
+                              onClick={() => handleCheckPayment(inv.id)}
+                              disabled={isChecking}
+                            >
+                              {isChecking ? (
+                                <Loader2 className="size-2.5 animate-spin" />
+                              ) : (
+                                <RefreshCw className="size-2.5" />
+                              )}
+                              Cek
+                            </Button>
+                          </div>
+                        )}
 
-                      <Badge className={cn("text-[10px]", sc?.className)}>
-                        {sc?.label ?? inv.status}
-                      </Badge>
+                        <Badge className={cn("text-[10px]", sc?.className)}>
+                          {sc?.label ?? inv.status}
+                        </Badge>
+                      </div>
                     </div>
+
+                    {/* Inline QR code display */}
+                    {isQrVisible && inv.qrString && (
+                      <div className="px-5 pb-4 flex items-start gap-4 bg-zinc-50/50">
+                        <div className="rounded-lg border border-zinc-200 bg-white p-2">
+                          <QRCodeSVG
+                            value={inv.qrString}
+                            size={100}
+                            level="M"
+                          />
+                        </div>
+                        <div className="text-xs text-zinc-500 space-y-1 pt-1">
+                          <p>
+                            Scan QR code untuk membayar via e-wallet atau mobile
+                            banking.
+                          </p>
+                          {inv.paymentExpiresAt && (
+                            <p className="text-zinc-400">
+                              Bayar sebelum{" "}
+                              <span className="font-medium text-zinc-600">
+                                {formatDateTime(inv.paymentExpiresAt)}
+                              </span>
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}

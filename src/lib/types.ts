@@ -98,9 +98,11 @@ export interface SubscriptionInvoice {
   status: "PENDING" | "PAID" | "FAILED";
   paymentMethod: string;
   paymentUrl: string | null;
+  qrString: string | null;
   orderId: string;
   periodStart: string;
   periodEnd: string;
+  paymentExpiresAt: string | null;
   paidAt: string | null;
   createdAt: string;
 }
@@ -116,7 +118,6 @@ export interface CheckPaymentResponse {
   data: {
     status: string;
     subscription?: Subscription;
-    paidAt?: string | null;
   };
 }
 
@@ -303,17 +304,4 @@ export interface UpdateElementRequest {
 
 export interface AssetUploadResponse {
   url: string;
-}
-// ── Dashboard ────────────────────────────────────────────────────────────────
-
-export interface DashboardStats {
-  walletBalance: number;
-  totalRevenueThisMonth: number;
-  totalTransactionsToday: number;
-  activeKiosks: number;
-  maxKiosks: number;
-  subscriptionPlanName: string;
-  subscriptionStatus: SubscriptionStatus;
-  subscriptionPeriodEnd: string;
-  subscriptionDaysLeft: number;
 }
