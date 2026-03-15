@@ -3,7 +3,7 @@ import {
   useQueryClient,
   keepPreviousData,
 } from "@tanstack/react-query";
-import { api, ApiError } from "@/lib/api";
+import { api } from "@/lib/api";
 import type { ApiPaginatedResponse, ApiSuccessResponse } from "@/lib/api";
 import type {
   SubscriptionPlan,

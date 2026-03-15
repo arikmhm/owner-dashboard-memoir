@@ -4,11 +4,7 @@ import type { ApiSuccessResponse } from "@/lib/api";
 import type {
   Template,
   TemplateElement,
-  TemplateWithElements,
-  CreateTemplateRequest,
   UpdateTemplateRequest,
-  CreateElementRequest,
-  UpdateElementRequest,
   AssetFolder,
   AssetUploadResponse,
 } from "@/lib/types";
@@ -74,7 +70,7 @@ export function useTemplates(): UseTemplatesReturn {
       );
     }
     // Strip embedded elements to produce a clean Template
-    const { elements: _embedded, ...template } = t;
+    const { elements: _unused, ...template } = t;
     return template;
   });
 

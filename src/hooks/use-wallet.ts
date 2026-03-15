@@ -9,7 +9,6 @@ import type { ApiSuccessResponse } from "@/lib/api";
 import type {
   WalletMutation,
   Withdrawal,
-  WithdrawalStatus,
   PaginationMeta,
   CreateWithdrawalRequest,
   CreateWithdrawalResponse,

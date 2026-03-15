@@ -35,7 +35,6 @@ import {
   Square,
   Upload,
   Circle,
-  AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -48,7 +47,6 @@ import {
   createTemplateWithElements,
   updateTemplateWithElements,
   uploadDataUrlAsset,
-  uploadAsset,
   type TemplateSaveData,
 } from "@/hooks/use-templates";
 import type {

@@ -16,7 +16,7 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { getToken, removeToken } from "@/lib/api";
+import { getToken, removeToken, ApiError } from "@/lib/api";
 import {
   login as apiLogin,
   logout as apiLogout,
@@ -96,7 +96,7 @@ function hasActiveSubscription(status: SubscriptionStatus | null): boolean {
 }
 
 /** Check if subscription needs onboarding (no sub, expired, pending payment) */
-function needsOnboarding(status: SubscriptionStatus | null): boolean {
+function _needsOnboarding(status: SubscriptionStatus | null): boolean {
   return (
     status === null ||
     status === "EXPIRED" ||
@@ -161,8 +161,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           );
           setPendingUpgrade(subResponse.pendingUpgrade ?? null);
         }
-      } catch {
-        // Subscription fetch failure is non-blocking
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 401) {
+          // Token invalid — clear user state so route protection redirects to /login
+          setUser(null);
+          setIsLoading(false);
+          return;
+        }
+        // Non-auth errors: subscription fetch is non-blocking
         setSubscription(null);
         setSubscriptionStatus(null);
         setPendingUpgrade(null);
