@@ -82,15 +82,20 @@ function OnboardingContent() {
   const subscriptionMutation = useMutation({
     mutationFn: createSubscription,
     onSuccess: (result) => {
-      if (result.invoice.paymentUrl) {
-        // Redirect to payment gateway — Xendit will redirect back to
-        // /onboarding?invoice_id=<UUID> after payment
-        window.location.href = result.invoice.paymentUrl;
+      const { invoice } = result;
+
+      if (invoice.qrString) {
+        // Prefer inline QRIS display over redirect
+        setPendingInvoiceId(invoice.id);
+        setPendingQrString(invoice.qrString);
+        setPendingExpiresAt(invoice.paymentExpiresAt ?? null);
+        setStep("checking-payment");
+      } else if (invoice.paymentUrl) {
+        // Fallback: redirect to Xendit payment page
+        window.location.href = invoice.paymentUrl;
       } else {
-        // No payment URL — stay on page (QRIS: display QR code inline)
-        setPendingInvoiceId(result.invoice.id);
-        setPendingQrString(result.invoice.qrString ?? null);
-        setPendingExpiresAt(result.invoice.paymentExpiresAt ?? null);
+        // Neither available (PG call failed) — show checking-payment with fallback
+        setPendingInvoiceId(invoice.id);
         setStep("checking-payment");
       }
     },
@@ -188,18 +193,20 @@ function OnboardingContent() {
     router.replace("/onboarding");
   }, [router]);
 
-  // Auto-check payment status when returning from Xendit
+  // Auto-check payment status only when returning from Xendit redirect
+  // (indicated by ?invoice_id= in URL). For inline QRIS, user clicks manually.
   useEffect(() => {
     if (
       step === "checking-payment" &&
       pendingInvoiceId &&
+      invoiceIdFromUrl &&
       paymentStatus === "idle" &&
       !autoCheckTriggered.current
     ) {
       autoCheckTriggered.current = true;
       handleCheckPayment();
     }
-  }, [step, pendingInvoiceId, paymentStatus, handleCheckPayment]);
+  }, [step, pendingInvoiceId, invoiceIdFromUrl, paymentStatus, handleCheckPayment]);
 
   // Loading state
   if (authLoading) {
@@ -251,6 +258,31 @@ function OnboardingContent() {
                     </span>
                   </p>
                 )}
+              </div>
+            )}
+
+          {/* Fallback: QR generation failed — no qrString and not returning from Xendit */}
+          {!pendingQrString &&
+            !invoiceIdFromUrl &&
+            paymentStatus !== "paid" &&
+            paymentStatus !== "failed" && (
+              <div className="flex flex-col items-center gap-3 rounded-lg border border-yellow-200 bg-yellow-50 p-4">
+                <AlertCircle className="h-8 w-8 text-yellow-600" />
+                <div className="space-y-1 text-center">
+                  <p className="text-sm font-medium text-yellow-800">
+                    QR code pembayaran tidak tersedia
+                  </p>
+                  <p className="text-xs text-yellow-600">
+                    Terjadi kendala saat membuat QR code. Silakan coba lagi.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleBackToPlans}
+                >
+                  Kembali ke Pilihan Plan
+                </Button>
               </div>
             )}
 
