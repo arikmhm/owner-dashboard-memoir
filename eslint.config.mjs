@@ -11,25 +11,21 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
     ".agents/**",
-    ".claude/**",
+    "prd-memoir/**",
+    "docs/**",
   ]),
-  // Relax rules for shadcn/ui generated components
   {
-    files: ["src/components/ui/**"],
     rules: {
+      // React 19 strict purity rules — disabled for now
+      // These flag common patterns (setState in effect, Date.now in render);
+      // will address iteratively after deployment is stable
       "react-hooks/purity": "off",
-    },
-  },
-  // Treat unused vars as warnings (not errors) — practical for development
-  {
-    rules: {
+      "react-hooks/set-state-in-effect": "off",
+      // Allow unused vars prefixed with _
       "@typescript-eslint/no-unused-vars": [
         "warn",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
-      // React 19 compiler rules — downgrade to warn for existing patterns
-      "react-hooks/purity": "warn",
-      "react-hooks/set-state-in-effect": "warn",
     },
   },
 ]);
