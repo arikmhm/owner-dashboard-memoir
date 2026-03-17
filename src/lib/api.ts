@@ -112,7 +112,11 @@ async function apiFetch<T>(
 
   // Handle 401 → try token refresh, then retry once
   if (res.status === 401) {
-    if (!_isRetry) {
+    // Auth endpoints: 401 means invalid credentials, not an expired session.
+    // Skip token refresh and hard redirect — let the caller handle the error.
+    const isAuthEndpoint = endpoint.startsWith("/auth/");
+
+    if (!isAuthEndpoint && !_isRetry) {
       // Use shared promise to deduplicate concurrent refreshes
       if (!refreshPromise) {
         refreshPromise = refreshAccessToken().finally(() => {
@@ -128,16 +132,26 @@ async function apiFetch<T>(
       }
     }
 
-    // Refresh failed or already a retry → clear and redirect
-    removeToken();
-    if (typeof window !== "undefined") {
-      window.location.href = "/login";
+    if (!isAuthEndpoint) {
+      // Refresh failed or already a retry → clear and redirect
+      removeToken();
+      if (typeof window !== "undefined") {
+        window.location.href = "/login";
+      }
     }
-    throw new ApiError(
-      401,
-      "UNAUTHORIZED",
-      "Sesi berakhir, silakan login kembali",
-    );
+
+    // Parse actual backend error response instead of hardcoding
+    let errorData: ApiErrorResponse;
+    try {
+      errorData = await res.json();
+    } catch {
+      errorData = {
+        error: "UNAUTHORIZED",
+        message: "Sesi berakhir, silakan login kembali",
+      };
+    }
+
+    throw new ApiError(res.status, errorData.error, errorData.message);
   }
 
   if (!res.ok) {

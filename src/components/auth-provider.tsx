@@ -26,6 +26,7 @@ import type {
   AuthUser,
   LoginRequest,
   Subscription,
+  SubscriptionResponse,
   SubscriptionStatus,
 } from "@/lib/types";
 
@@ -95,16 +96,6 @@ function hasActiveSubscription(status: SubscriptionStatus | null): boolean {
   return status === "ACTIVE" || status === "GRACE_PERIOD";
 }
 
-/** Check if subscription needs onboarding (no sub, expired, pending payment) */
-function _needsOnboarding(status: SubscriptionStatus | null): boolean {
-  return (
-    status === null ||
-    status === "EXPIRED" ||
-    status === "CANCELLED" ||
-    status === "PENDING_PAYMENT"
-  );
-}
-
 // ── Provider component ───────────────────────────────────────────────────────
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -163,7 +154,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) {
-          // Token invalid — clear user state so route protection redirects to /login
+          // Token invalid — clear token & user state; apiFetch already
+          // attempted refresh and queued a hard redirect, but we also
+          // removeToken here defensively in case the flow changes.
+          removeToken();
           setUser(null);
           setIsLoading(false);
           return;
@@ -237,24 +231,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const handleLogin = useCallback(
     async (credentials: LoginRequest) => {
       const { user: authUser } = await apiLogin(credentials);
-      setUser(authUser);
 
-      // Fetch subscription after login to determine redirect
+      // Fetch subscription BEFORE setting user state.
+      // Setting user first would make isAuthenticated=true, which triggers
+      // the route-protection effect. That effect would see no subscription
+      // yet and prematurely redirect to /onboarding — even if the user has
+      // an active subscription that hasn't loaded yet.
       let subStatus: SubscriptionStatus | null = null;
+      let subResponse: SubscriptionResponse | null = null;
       try {
-        const subResponse = await getSubscription();
+        subResponse = await getSubscription();
         if (subResponse) {
-          setSubscription(subResponse.subscription);
-          setSubscriptionStatus(subResponse.subscriptionStatus);
-          setGracePeriodDaysRemaining(
-            subResponse.gracePeriodDaysRemaining ?? 0,
-          );
-          setPendingUpgrade(subResponse.pendingUpgrade ?? null);
           subStatus = subResponse.subscriptionStatus;
         }
       } catch {
         // Non-blocking — treat as no subscription
       }
+
+      // Batch all state updates synchronously (React 18+ automatic batching)
+      // so the route-protection effect sees the complete picture in one render.
+      if (subResponse) {
+        setSubscription(subResponse.subscription);
+        setSubscriptionStatus(subResponse.subscriptionStatus);
+        setGracePeriodDaysRemaining(
+          subResponse.gracePeriodDaysRemaining ?? 0,
+        );
+        setPendingUpgrade(subResponse.pendingUpgrade ?? null);
+      }
+      setUser(authUser);
 
       // Redirect based on subscription status
       if (hasActiveSubscription(subStatus)) {
