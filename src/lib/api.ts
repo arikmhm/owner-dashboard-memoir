@@ -49,15 +49,11 @@ export function getToken(): string | null {
 export function setToken(token: string): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(TOKEN_KEY, token);
-  // Sync to cookie for middleware access (optimistic edge-level check)
-  document.cookie = `${TOKEN_KEY}=${token};path=/;max-age=${60 * 60 * 24 * 30};SameSite=Lax`;
 }
 
 export function removeToken(): void {
   if (typeof window === "undefined") return;
   localStorage.removeItem(TOKEN_KEY);
-  // Clear cookie
-  document.cookie = `${TOKEN_KEY}=;path=/;max-age=0`;
 }
 
 // ── Token refresh ────────────────────────────────────────────────────────────

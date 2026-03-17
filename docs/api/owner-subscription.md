@@ -111,7 +111,7 @@ Authorization: Bearer <accessToken>
 
 ### POST `/owner/subscription`
 
-Membuat subscription baru atau upgrade plan. Selalu membuat **subscription row baru** dengan status `PENDING_PAYMENT`. Subscription ACTIVE yang sudah ada **tidak disentuh** sampai pembayaran dikonfirmasi via check-payment.
+Membuat subscription baru atau upgrade plan. Selalu membuat **subscription row baru** dengan status `PENDING_PAYMENT`. Subscription ACTIVE yang sudah ada **tidak disentuh** sampai pembayaran dikonfirmasi via webhook Xendit.
 
 #### Request
 
@@ -163,10 +163,12 @@ Content-Type: application/json
       "billingPeriod": "MONTHLY",
       "status": "PENDING",
       "paymentMethod": "PG",
-      "paymentUrl": "https://pay.xendit.co/...",
+      "paymentUrl": null,
+      "qrString": "00020101021126580...",
       "orderId": "SUB-1705312200000-a1b2c3",
       "periodStart": "2024-01-15T10:00:00.000Z",
       "periodEnd": "2024-02-15T10:00:00.000Z",
+      "paymentExpiresAt": "2024-01-16T10:00:00.000Z",
       "paidAt": null,
       "createdAt": "2024-01-15T10:00:00.000Z"
     }
@@ -179,20 +181,20 @@ Content-Type: application/json
 | Status | Code        | Description                                                                             |
 | ------ | ----------- | --------------------------------------------------------------------------------------- |
 | 404    | `NOT_FOUND` | Plan tidak ditemukan atau sudah inactive                                                |
-| 409    | `CONFLICT`  | Sudah subscribe ke plan + billing period yang sama, atau sudah ada pending subscription |
+| 409    | `CONFLICT`  | Sudah subscribe ke plan + billing period yang sama (saat ACTIVE) |
 
 **Business Rules:**
 
 - Subscription selalu dibuat sebagai **row baru** dengan status `PENDING_PAYMENT` — TIDAK langsung ACTIVE dan TIDAK mengubah subscription ACTIVE yang sudah ada.
 - **Safe upgrade:** Saat owner upgrade plan, subscription ACTIVE lama tetap berjalan. Kiosk tetap beroperasi selama pembayaran plan baru belum selesai.
-- Hanya boleh ada **1 pending subscription** per owner. Jika sudah ada PENDING_PAYMENT, ditolak dengan 409 Conflict.
+- Diperbolehkan membuat subscription baru meskipun sudah ada PENDING_PAYMENT (akan di-log sebagai warning).
 - Re-subscribe ke plan+period yang sama (saat sudah ACTIVE) ditolak dengan 409 Conflict.
-- **Saat pembayaran berhasil** (via check-payment): subscription baru diaktifkan (`ACTIVE`), subscription lama di-cancel (`CANCELLED`).
-- **Saat pembayaran gagal/expire** (via check-payment): subscription baru di-expire (`EXPIRED`), subscription lama tetap `ACTIVE`.
+- **Saat pembayaran berhasil** (via webhook Xendit): subscription baru diaktifkan (`ACTIVE`), subscription lama di-cancel (`CANCELLED`).
+- **Saat pembayaran gagal/expire** (via webhook Xendit): subscription baru di-expire (`EXPIRED`), subscription lama tetap `ACTIVE`.
 - Price snapshot diambil dari plan saat ini (immutable setelah subscribe).
-- PG call dilakukan setelah transaction commit. Jika PG gagal, subscription tetap `PENDING_PAYMENT` dan client bisa retry via check-payment.
+- PG call dilakukan setelah transaction commit untuk menghasilkan QR code. Jika PG gagal, subscription tetap `PENDING_PAYMENT`.
 - Operasi DB di-wrap dalam UnitOfWork transaction untuk atomicity.
-- **Payment Redirect:** Jika env `FRONTEND_URL` di-set, Xendit invoice akan include `success_redirect_url` yang mengarahkan user kembali ke `${FRONTEND_URL}/onboarding?invoice_id=${invoiceId}` setelah pembayaran berhasil. `invoice_id` menggunakan internal invoice UUID (bukan orderId) sehingga frontend dapat langsung memanggil `POST /subscription/invoices/:id/check-payment` tanpa lookup tambahan. Tanpa `FRONTEND_URL`, user tetap di halaman sukses Xendit.
+- Client dapat memanggil `POST /subscription/invoices/:id/check-payment` untuk melihat status terbaru dari database.
 
 ---
 
@@ -230,10 +232,12 @@ Authorization: Bearer <accessToken>
       "billingPeriod": "MONTHLY",
       "status": "PAID",
       "paymentMethod": "PG",
-      "paymentUrl": "https://pay.xendit.co/...",
+      "paymentUrl": null,
+      "qrString": "00020101021126580...",
       "orderId": "SUB-1705312200000-a1b2c3",
       "periodStart": "2024-01-15T10:00:00.000Z",
       "periodEnd": "2024-02-15T10:00:00.000Z",
+      "paymentExpiresAt": "2024-01-16T10:00:00.000Z",
       "paidAt": "2024-01-15T10:05:00.000Z",
       "createdAt": "2024-01-15T10:00:00.000Z"
     }
@@ -250,7 +254,7 @@ Authorization: Bearer <accessToken>
 
 ### POST `/owner/subscription/invoices/:id/check-payment`
 
-Cek status pembayaran invoice ke payment gateway dan update status secara atomik.
+Cek status pembayaran invoice dari database. Read-only endpoint — tidak memanggil Xendit API. Settlement dilakukan otomatis melalui webhook Xendit.
 
 #### Request
 
@@ -294,18 +298,16 @@ Authorization: Bearer <accessToken>
 
 | Status    | Description                                                    |
 | --------- | -------------------------------------------------------------- |
-| `PAID`    | Pembayaran berhasil — subscription diaktifkan ke `ACTIVE`      |
-| `PENDING` | Pembayaran masih pending atau PG tidak tersedia                |
-| `FAILED`  | Pembayaran gagal/expired — subscription di-revert ke `EXPIRED` |
+| `PAID`    | Pembayaran berhasil (di-settle via webhook)                    |
+| `PENDING` | Menunggu pembayaran — webhook belum diterima                   |
+| `FAILED`  | Pembayaran gagal/expired (di-update via webhook)               |
 
 **Notes:**
 
 - `subscription` field hanya terisi jika status `PAID`.
-- Idempotent: invoice yang sudah `PAID` langsung return `PAID` tanpa call PG.
-- Invoice yang sudah `FAILED` langsung return `FAILED` tanpa call PG.
-- Jika PG throw error → return `PENDING`, no state change (safe retry).
-- Settlement di-wrap dalam UnitOfWork transaction: invoice `PAID` + subscription `ACTIVE` atomik.
-- Expire/cancel di-wrap dalam UnitOfWork transaction: invoice `FAILED` + subscription `EXPIRED` atomik.
+- Endpoint tidak memanggil Xendit API, hanya membaca status dari database.
+- Settlement (invoice `PAID` + subscription `ACTIVE`) dilakukan via webhook Xendit, tidak di check-payment.
+- Expire/cancel (invoice `FAILED` + subscription `EXPIRED`) juga dilakukan via webhook Xendit.
 
 #### Error Responses
 

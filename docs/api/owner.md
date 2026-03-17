@@ -247,6 +247,7 @@ No body required.
   "data": [
     {
       "id": "uuid",
+      "ownerId": "uuid",
       "name": "Classic",
       "width": 576,
       "height": 864,
@@ -311,19 +312,22 @@ Authorization: Bearer <accessToken>
 ```json
 {
   "data": {
-    "id": "uuid",
-    "name": "Classic",
-    "width": 576,
-    "height": 864,
-    "backgroundUrl": "https://storage/bg.png",
-    "overlayUrl": null,
-    "overridePriceBase": null,
-    "overridePriceExtraPrint": null,
-    "overridePriceDigitalCopy": null,
-    "isActive": true,
-    "createdAt": "2025-01-01T00:00:00.000Z",
-    "updatedAt": "2025-01-01T00:00:00.000Z",
-    "elements": []
+    "template": {
+      "id": "uuid",
+      "ownerId": "uuid",
+      "name": "Classic",
+      "width": 576,
+      "height": 864,
+      "backgroundUrl": "https://storage/bg.png",
+      "overlayUrl": null,
+      "overridePriceBase": null,
+      "overridePriceExtraPrint": null,
+      "overridePriceDigitalCopy": null,
+      "isActive": true,
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-01T00:00:00.000Z",
+      "elements": []
+    }
   }
 }
 ```
@@ -383,18 +387,21 @@ Content-Type: application/json
 ```json
 {
   "data": {
-    "id": "uuid",
-    "name": "Classic",
-    "width": 576,
-    "height": 864,
-    "backgroundUrl": "https://storage/bg.png",
-    "overlayUrl": null,
-    "overridePriceBase": null,
-    "overridePriceExtraPrint": null,
-    "overridePriceDigitalCopy": null,
-    "isActive": true,
-    "createdAt": "2025-01-01T00:00:00.000Z",
-    "updatedAt": "2025-01-01T00:00:00.000Z"
+    "template": {
+      "id": "uuid",
+      "ownerId": "uuid",
+      "name": "Classic",
+      "width": 576,
+      "height": 864,
+      "backgroundUrl": "https://storage/bg.png",
+      "overlayUrl": null,
+      "overridePriceBase": null,
+      "overridePriceExtraPrint": null,
+      "overridePriceDigitalCopy": null,
+      "isActive": true,
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-01T00:00:00.000Z"
+    }
   }
 }
 ```
@@ -450,7 +457,7 @@ Content-Type: application/json
 
 #### Response — 200 OK
 
-Returns the updated template object (same shape as create response).
+Returns the updated template wrapped in `data.template` (same shape as create response).
 
 #### Error Responses
 
@@ -484,7 +491,7 @@ No body required.
 
 #### Response — 200 OK
 
-Returns the deleted template object.
+Returns the deleted template wrapped in `data.template` (same shape as create response, without elements).
 
 #### Error Responses
 
@@ -597,7 +604,26 @@ Content-Type: application/json
 
 #### Response — 201 Created
 
-Returns the created element object.
+```json
+{
+  "data": {
+    "element": {
+      "id": "uuid",
+      "templateId": "uuid",
+      "elementType": "photo_slot",
+      "sequence": 1,
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 300,
+      "rotation": 0,
+      "opacity": 100,
+      "properties": { "captureOrder": 1 },
+      "createdAt": "2025-01-01T00:00:00.000Z"
+    }
+  }
+}
+```
 
 #### Error Responses
 
@@ -654,7 +680,7 @@ Content-Type: application/json
 
 #### Response — 200 OK
 
-Returns the updated element object.
+Returns the updated element wrapped in `data.element` (same shape as create response).
 
 #### Error Responses
 
@@ -690,7 +716,7 @@ No body required.
 
 #### Response — 200 OK
 
-Returns the deleted element object.
+Returns the deleted element wrapped in `data.element` (same shape as create response).
 
 #### Error Responses
 

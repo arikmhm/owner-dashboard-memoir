@@ -43,6 +43,7 @@ Enum billing_period {
 
 Enum subscription_status {
   ACTIVE
+  PENDING_PAYMENT  [note: "Menunggu pembayaran, belum aktif"]
   EXPIRED
   CANCELLED
   GRACE_PERIOD  [note: "Belum bayar tapi masih diberi waktu toleransi"]
@@ -157,11 +158,13 @@ Table subscription_invoices as SI {
 
   payment_method payment_method
   payment_url text [note: "URL checkout jika pakai PG"]
+  qr_string text [note: "QR string dari PG jika pakai QRIS"]
   order_id varchar [unique, not null, note: "Ref ID untuk payment gateway"]
 
   period_start timestamptz [not null]
   period_end timestamptz [not null]
 
+  payment_expires_at timestamptz [note: "Waktu kadaluarsa pembayaran PG"]
   paid_at timestamptz
   created_at timestamptz [not null, default: `now()`]
 
@@ -268,6 +271,8 @@ Table transactions as TX {
   status tx_status [not null, default: 'PENDING']
   payment_method payment_method [not null]
   payment_url text
+  qr_string text [note: "QR string dari PG jika pakai QRIS"]
+  payment_expires_at timestamptz [note: "Waktu kadaluarsa pembayaran PG"]
 
   print_qty integer [not null, default: 1]
   has_digital_copy boolean [not null, default: false]

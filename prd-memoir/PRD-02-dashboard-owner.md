@@ -1,7 +1,7 @@
 # PRD-02: Dashboard Owner Photobooth (Web)
 
-> **Versi:** 1.2
-> **Tanggal:** 8 Maret 2026
+> **Versi:** 1.0
+> **Tanggal:** 6 Maret 2026
 > **Status:** Draft — For Review
 > **Audiens:** Internal dev team & AI coding agents
 > **Parent:** [PRD-00-master.md](./PRD-00-master.md) (Platform Overview)
@@ -42,9 +42,15 @@ Dashboard berkomunikasi dengan memoir. Backend API (`/api/v1/owner/*` dan `/api/
 
 ### 2.1 User Persona
 
-> **P2 — Studio Owner** — Lihat [PRD-00 §2](./PRD-00-master.md) untuk deskripsi lengkap persona.
->
-> Satu-satunya persona yang menggunakan Owner Dashboard.
+#### P2 — Studio Owner
+
+Satu-satunya persona yang menggunakan Owner Dashboard. Studio owner yang mengelola satu atau lebih booth photobooth receipt. Mereka:
+
+- Login menggunakan email & password (akun dibuat oleh admin, tidak ada self-registration)
+- Mengelola kiosk devices, template desain cetak, pricing, dan subscription
+- Memantau transaksi dan keuangan booth melalui wallet
+- Menginginkan antarmuka yang simpel, tanpa background teknis
+- Berbahasa Indonesia (seluruh UI dalam Bahasa Indonesia)
 
 ### 2.2 Epic & Feature Index
 
@@ -68,20 +74,68 @@ Dashboard berkomunikasi dengan memoir. Backend API (`/api/v1/owner/*` dan `/api/
 
 ### 2.3 Non-Goals (Apa yang TIDAK dibangun)
 
-> Non-goals platform-wide (PWA, i18n, dark mode, self-registration, dll.) → lihat [PRD-00 §10.2](./PRD-00-master.md).
->
-> Berikut non-goals **spesifik frontend Owner Dashboard**:
-
-| #     | Non-Goal                            | Alasan                                       |
-| ----- | ----------------------------------- | -------------------------------------------- |
-| NG-01 | Customer-facing pages               | Customer berinteraksi via kiosk saja         |
-| NG-02 | Template editor di mobile (< 768px) | Canvas editing terlalu kompleks untuk mobile |
+| #     | Non-Goal                                | Alasan                                       |
+| ----- | --------------------------------------- | -------------------------------------------- |
+| NG-01 | Kiosk Runner UI (Electron / Flutter)    | Aplikasi terpisah (PRD-04 / PRD-05)          |
+| NG-02 | Platform Admin dashboard                | Aplikasi terpisah (PRD-03)                   |
+| NG-03 | Mobile app (iOS/Android)                | Scope: responsive web only                   |
+| NG-04 | PWA / offline mode                      | Owner membutuhkan koneksi internet           |
+| NG-05 | Real-time push notification / WebSocket | MVP polling-based                            |
+| NG-06 | Multi-language / i18n                   | Semua UI dalam Bahasa Indonesia              |
+| NG-07 | Export CSV / PDF                        | Tidak ada export di MVP                      |
+| NG-08 | Self-registration owner                 | Akun dibuat oleh admin                       |
+| NG-09 | Customer-facing pages                   | Customer berinteraksi via kiosk saja         |
+| NG-10 | Template editor di mobile (< 768px)     | Canvas editing terlalu kompleks untuk mobile |
+| NG-11 | Dark mode                               | Tidak prioritas untuk MVP                    |
 
 ---
 
 ## 3. Technical Specifications
 
-### 3.1 Rendering Strategy
+### 3.1 Architecture Overview
+
+```
+┌───────────────────────────────────────────────────────────────┐
+│                      Next.js App Router                       │
+│                                                               │
+│  Route Groups:                                                │
+│    (auth)/     → /login                                       │
+│    (dashboard)/ → /, /kiosks, /templates, /transactions,      │
+│                   /wallet, /subscription                      │
+│    onboarding/ → /onboarding                                  │
+│                                                               │
+│  ┌─────────────┐  ┌──────────────┐  ┌───────────────────┐     │
+│  │   Server    │  │   Client     │  │   Shared          │     │
+│  │  Components │  │  Components  │  │                   │     │
+│  │             │  │              │  │  lib/api.ts       │     │
+│  │  page.tsx   │  │  Template    │  │  lib/auth-api.ts  │     │
+│  │  layout.tsx │  │  Editor      │  │  lib/types.ts     │     │
+│  │             │  │  (Konva)     │  │  lib/format.ts    │     │
+│  │             │  │              │  │  lib/constants.ts │     │
+│  └──────┬──────┘  └──────┬───────┘  └───────────────────┘     │
+│         │                │                                    │
+│         ▼                ▼                                    │
+│  ┌──────────────────────────────────────────┐                 │
+│  │           API Client (lib/api.ts)        │                 │
+│  │  fetch() + JWT Authorization header      │                 │
+│  │  + ApiError + token management           │                 │
+│  └──────────────────┬───────────────────────┘                 │
+│                     │                                         │
+│  ┌──────────────────┴───────────────────────┐                 │
+│  │      Auth Layer (auth-provider.tsx)      │                 │
+│  │  Context: user, subscription, actions    │                 │
+│  │  Route protection + onboarding redirect  │                 │
+│  └──────────────────────────────────────────┘                 │
+│                     │                                         │
+└─────────────────────┼─────────────────────────────────────────┘
+                      │ HTTPS
+                      ▼
+              memoir. Backend API
+              /api/v1/owner/*
+              /api/v1/auth/*
+```
+
+### 3.2 Rendering Strategy
 
 | Route / Component          | Rendering                                 | Alasan                                       |
 | -------------------------- | ----------------------------------------- | -------------------------------------------- |
@@ -96,7 +150,7 @@ Dashboard berkomunikasi dengan memoir. Backend API (`/api/v1/owner/*` dan `/api/
 | `(auth)/login`             | Server + Client form                      | Form submit perlu client logic               |
 | `onboarding`               | Server + Client toggle                    | Plan cards SSR, billing toggle client        |
 
-### 3.2 Tech Stack
+### 3.3 Tech Stack
 
 | Layer             | Technology                       | Version           | Catatan                                                                        |
 | ----------------- | -------------------------------- | ----------------- | ------------------------------------------------------------------------------ |
@@ -116,7 +170,7 @@ Dashboard berkomunikasi dengan memoir. Backend API (`/api/v1/owner/*` dan `/api/
 | Form Validation   | **Zod** + **react-hook-form**    | zod 3.x / rhf 7.x | Schema validation matching backend Zod schemas; shadcn/ui `<Form>` integration |
 | Package Manager   | npm                              | —                 | Sesuai existing setup                                                          |
 
-### 3.3 Route Map
+### 3.4 Route Map
 
 | Route                 | File                                       | Auth | Subscription | Page Title    |
 | --------------------- | ------------------------------------------ | :--: | :----------: | ------------- |
@@ -131,37 +185,187 @@ Dashboard berkomunikasi dengan memoir. Backend API (`/api/v1/owner/*` dan `/api/
 | `/wallet`             | `(dashboard)/wallet/page.tsx`              |  ✅  |      ✅      | Wallet        |
 | `/subscription`       | `(dashboard)/subscription/page.tsx`        |  ✅  |  ✅ (view)   | Subscription  |
 
+### 3.5 Project Structure
+
+```
+src/
+├── app/
+│   ├── globals.css
+│   ├── layout.tsx              # Root layout: Inter font, AuthProvider, TooltipProvider
+│   ├── (auth)/
+│   │   └── login/
+│   │       └── page.tsx        # Login form
+│   ├── (dashboard)/
+│   │   ├── layout.tsx          # Sidebar + main content wrapper
+│   │   ├── page.tsx            # Dashboard home
+│   │   ├── kiosks/
+│   │   │   └── page.tsx        # Kiosk list
+│   │   ├── templates/
+│   │   │   ├── layout.tsx      # Templates metadata
+│   │   │   ├── page.tsx        # Template grid
+│   │   │   ├── create/
+│   │   │   │   └── page.tsx    # 2-step template wizard
+│   │   │   └── [id]/
+│   │   │       └── edit/
+│   │   │           └── page.tsx  # Edit template
+│   │   ├── transactions/
+│   │   │   └── page.tsx        # Transaction table
+│   │   ├── wallet/
+│   │   │   └── page.tsx        # Wallet + withdrawals
+│   │   └── subscription/
+│   │       └── page.tsx        # Subscription + invoices
+│   └── onboarding/
+│       └── page.tsx            # Plan selection
+├── components/
+│   ├── app-sidebar.tsx         # Collapsible sidebar navigation
+│   ├── auth-provider.tsx       # Auth context (user, subscription, route protection)
+│   ├── templates/
+│   │   └── steps/
+│   │       ├── step-upload-crop.tsx  # Upload & crop wizard step
+│   │       ├── step-editor.tsx       # Canvas editor wrapper + tools panel
+│   │       └── editor-canvas.tsx     # Konva canvas renderer
+│   └── ui/                     # shadcn/ui components (10+ files)
+├── hooks/
+│   └── use-mobile.ts           # Mobile breakpoint hook
+└── lib/
+    ├── api.ts                  # API client (fetch wrapper, token mgmt, ApiError)
+    ├── auth-api.ts             # Auth API functions (login, logout, subscription)
+    ├── types.ts                # TypeScript interfaces (Auth, Subscription, etc.)
+    ├── constants.ts            # Status configs, labels
+    ├── format.ts               # Rupiah, date, datetime formatters
+    ├── template-variables.ts   # 12 template variables + resolver
+    └── utils.ts                # cn() utility
+```
+
 ---
 
 ## 4. Authentication & Route Protection
 
-> Detail auth flow (JWT, refresh token, logout) → lihat [PRD-01 §6](./PRD-01-backend-api.md) dan [PRD-00 §8.1](./PRD-00-master.md).
->
-> Section ini hanya mendokumentasikan **behavior frontend-specific**.
+### 4.1 Auth Flow
 
-### 4.1 Frontend Auth Behavior
+```
+Login  → decode JWT → setUser → fetch subscription → redirect (/ or /onboarding)
+Mount  → check localStorage token → decode → fetch subscription → route protect
+401    → try refresh → if fail, clear token → redirect /login
+```
 
-| Aspek              | Implementasi                                                                                             |
-| ------------------ | -------------------------------------------------------------------------------------------------------- |
-| Token storage      | `accessToken` di `localStorage` via `lib/api.ts` (`getToken/setToken/removeToken`)                       |
-| Auth header        | `Authorization: Bearer {accessToken}` otomatis via `apiFetch()`                                          |
-| Route protection   | `AuthProvider` component — redirect ke `/login` jika token absent/expired                                |
-| Subscription guard | `AuthProvider` — cek status; jika EXPIRED → redirect `/onboarding`                                       |
-| 401 auto-handling  | `apiFetch()` intercept 401 → try refresh (`credentials: 'include'`) → if fail, clear + redirect `/login` |
-| Logout client-side | `removeToken()` + redirect `/login`                                                                      |
+### 4.2 Auth Details
+
+| Aspek              | Implementasi                                                                                                            |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| Login endpoint     | `POST /api/v1/auth/login` → `{ data: { accessToken, user } }` + Set-Cookie `refresh_token`                              |
+| Token storage      | `accessToken` di `localStorage` via `lib/api.ts` (`getToken/setToken/removeToken`); `refresh_token` via HttpOnly cookie |
+| Auth header        | `Authorization: Bearer {accessToken}` otomatis via `apiFetch()`                                                         |
+| Route protection   | `AuthProvider` component — redirect ke `/login` jika token absent/expired                                               |
+| Subscription check | `AuthProvider` — cek status; jika EXPIRED → redirect `/onboarding`                                                      |
+| Token refresh      | `POST /api/v1/auth/refresh` — cookie (`credentials: 'include'`), response: `{ data: { accessToken } }`                  |
+| Token expiry       | Access token short-lived; `apiFetch()` handle 401 → try refresh → if fail, clear + redirect                             |
+| Logout             | `POST /api/v1/auth/logout` — revoke refresh token, clear cookie; client: `removeToken()` + redirect `/login`            |
 
 ---
 
 ## 5. API Integration
 
-> **API conventions** (base URL, response format, error shape, field naming) → lihat [PRD-00 §8.2](./PRD-00-master.md).
->
-> **Endpoint list & response shapes** → lihat [PRD-01 §5.2](./PRD-01-backend-api.md) dan `docs/api/*.md` + `docs/postman/`.
-
 ### 5.1 API Client
 
 - **Base URL:** `NEXT_PUBLIC_API_URL` env var (default: `http://localhost:3000/api/v1`)
-- **Implementation:** `lib/api.ts` — `apiFetch()` wrapper with auto `Authorization` header, `ApiError` class, token management (`getToken/setToken/removeToken`), 401 auto-refresh
+- **Response format:** `{ data: ... }` sukses · `{ error: "CODE", message: "..." }` error · `{ data: [...], meta: { page, limit, total } }` paginated
+- **Field naming:** Backend menggunakan `camelCase`
+
+### 5.2 Endpoint Mapping per Page
+
+> [!NOTE]
+> **📋 Dokumentasi API terpisah belum dibuat.** File API contract (markdown) akan dibuat secara bertahap seiring dengan fitur/endpoint yang selesai di backend. Endpoint mapping di bawah ini adalah rencana berdasarkan PRD-01 dan akan di-update agar selalu sesuai dengan codebase aktual.
+
+| Frontend Page  | API Endpoint(s)                                                                                                                                                                                           |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Login          | `POST /auth/login`                                                                                                                                                                                        |
+| Onboarding     | `GET /owner/subscription/plans`, `POST /owner/subscription` · Setelah bayar, call `POST /owner/subscription/invoices/:id/check-payment` untuk display status (read-only, settlement otomatis via webhook) |
+| Dashboard Home | `GET /owner/subscription`, `GET /owner/wallet`, `GET /owner/kiosks`, `GET /owner/transactions`                                                                                                            |
+| Kiosks         | `GET/POST /owner/kiosks`, `PATCH /owner/kiosks/:id`, `POST /owner/kiosks/:id/generate-pairing`                                                                                                            |
+| Templates      | `GET/POST/PATCH/DELETE /owner/templates[/:id]`, `GET/POST/PATCH/DELETE /owner/templates/:id/elements[/:elementId]`                                                                                        |
+| Transactions   | `GET /owner/transactions` (paginated + filtered)                                                                                                                                                          |
+| Wallet         | `GET /owner/wallet` (paginated), `GET/POST /owner/withdrawals`                                                                                                                                            |
+| Subscription   | `GET/POST /owner/subscription`, `GET /owner/subscription/invoices`, `POST /owner/subscription/invoices/:id/check-payment`                                                                                 |
+
+### 5.3 API Response Shape Reference
+
+> [!WARNING]
+> **⏳ Response shape di bawah ini bersifat preliminary.** Bentuk response aktual akan mengikuti implementasi backend. Section ini akan di-update berkala seiring endpoint backend selesai dibangun. Gunakan sebagai referensi awal untuk TypeScript interfaces, tapi selalu verifikasi dengan API contract terbaru.
+
+#### Transaction
+
+```json
+{
+  "id": "uuid",
+  "orderId": "MEM-123-abc",
+  "status": "PAID",
+  "paymentMethod": "PG",
+  "printQty": 2,
+  "hasDigitalCopy": true,
+  "appliedBasePrice": 25000,
+  "appliedExtraPrintPrice": 5000,
+  "appliedDigitalCopyPrice": 10000,
+  "totalAmount": 40000,
+  "createdAt": "ISO8601",
+  "paidAt": "ISO8601"
+}
+```
+
+#### Wallet
+
+```json
+{
+  "data": {
+    "balance": 1500000,
+    "mutations": [
+      {
+        "type": "CREDIT",
+        "category": "TRANSACTION_INCOME",
+        "amount": 40000,
+        "currentBalanceSnapshot": 1500000,
+        "createdAt": "ISO8601"
+      }
+    ]
+  },
+  "meta": { "page": 1, "limit": 20, "total": 50 }
+}
+```
+
+#### Withdrawal
+
+```json
+{
+  "data": {
+    "withdrawal": {
+      "id": "uuid",
+      "amount": 500000,
+      "status": "PENDING",
+      "bankName": "BCA",
+      "bankAccountNumber": "1234567890",
+      "bankAccountName": "John Doe",
+      "createdAt": "ISO8601"
+    }
+  }
+}
+```
+
+#### Subscription
+
+```json
+{
+  "data": {
+    "subscription": {
+      "billingPeriod": "MONTHLY",
+      "status": "ACTIVE",
+      "pricePaid": 99000,
+      "currentPeriodEnd": "ISO8601"
+    },
+    "subscriptionStatus": "ACTIVE",
+    "gracePeriodDaysRemaining": 0
+  }
+}
+```
 
 ---
 
@@ -397,23 +601,18 @@ Dashboard berkomunikasi dengan memoir. Backend API (`/api/v1/owner/*` dan `/api/
 
 ### 9.1 Error Handling Pattern
 
-> Error codes & HTTP status → lihat [PRD-00 §8.3](./PRD-00-master.md) dan [PRD-01 §4.2](./PRD-01-backend-api.md).
->
-> Berikut **frontend-specific behavior** per error:
-
-| HTTP Status | Error Code                               | Frontend Behavior                                                         |
-| ----------- | ---------------------------------------- | ------------------------------------------------------------------------- |
-| 400         | `VALIDATION_ERROR`                       | Field-level error di form (via react-hook-form)                           |
-| 400         | `INSUFFICIENT_BALANCE`                   | Toast "Saldo tidak mencukupi"                                             |
-| 400         | `BELOW_MINIMUM`                          | Toast "Jumlah minimal withdrawal adalah Rp {amount}"                      |
-| 400         | `PRICE_MISMATCH`                         | Toast "Harga tidak sesuai, coba lagi"                                     |
-| 401         | `UNAUTHORIZED`                           | Auto: `apiFetch()` try refresh → if fail, clear token → redirect `/login` |
-| 403         | `FORBIDDEN` / `MAX_KIOSKS_REACHED`       | Toast + disable tombol relevan                                            |
-| 404         | `NOT_FOUND`                              | Redirect ke list page + toast                                             |
-| 409         | `CONFLICT` / `PENDING_WITHDRAWAL_EXISTS` | Toast pesan spesifik per context                                          |
-| 422         | `UNPROCESSABLE_ENTITY`                   | Toast pesan spesifik                                                      |
-| 429         | `RATE_LIMITED`                           | Toast "Terlalu banyak percobaan, coba lagi nanti"                         |
-| 500         | `INTERNAL_SERVER_ERROR`                  | Toast generik "Terjadi kesalahan, coba lagi nanti"                        |
+| HTTP Status | Error Code                               | Frontend Behavior                                  |
+| ----------- | ---------------------------------------- | -------------------------------------------------- |
+| 400         | `VALIDATION_ERROR`                       | Field-level error di form                          |
+| 400         | `INSUFFICIENT_BALANCE`                   | Toast "Saldo tidak mencukupi"                      |
+| 400         | `BELOW_MINIMUM`                          | Toast "Jumlah di bawah minimum withdrawal"         |
+| 401         | `UNAUTHORIZED`                           | Auto: clear token → redirect `/login`              |
+| 403         | `FORBIDDEN` / `MAX_KIOSKS_REACHED`       | Toast + disable tombol relevan                     |
+| 404         | `NOT_FOUND`                              | Redirect ke list page + toast                      |
+| 409         | `CONFLICT` / `PENDING_WITHDRAWAL_EXISTS` | Toast pesan spesifik                               |
+| 422         | `UNPROCESSABLE_ENTITY`                   | Toast pesan spesifik                               |
+| 429         | `RATE_LIMITED`                           | Toast "Terlalu banyak percobaan"                   |
+| 500         | `INTERNAL_SERVER_ERROR`                  | Toast generik "Terjadi kesalahan, coba lagi nanti" |
 
 ### 9.2 Loading States Pattern
 
@@ -440,19 +639,16 @@ Dashboard berkomunikasi dengan memoir. Backend API (`/api/v1/owner/*` dan `/api/
 
 ## 10. Security
 
-> Security backend (hashing, JWT secret, cookie config, rate limiting, CORS, SQL injection) → lihat [PRD-01 §10](./PRD-01-backend-api.md).
->
-> Berikut **frontend-specific security measures**:
-
-| Aspek                | Implementasi                                                                  |
-| -------------------- | ----------------------------------------------------------------------------- |
-| XSS prevention       | React auto-escaping; **tidak** menggunakan `dangerouslySetInnerHTML`          |
-| Input validation     | Client-side Zod schemas sebagai UX aid; backend adalah source of truth        |
-| File upload guard    | Validasi MIME (JPG/PNG) + size (5MB) **sebelum** upload ke server             |
-| Token isolation      | `accessToken` di localStorage; auto-clear saat 401; **tidak** log ke console  |
-| Refresh token        | Via HttpOnly cookie; `credentials: 'include'` hanya pada `/auth/*` requests   |
-| Sensitive data       | Tidak display `device_token`, `password_hash`, atau internal IDs di UI        |
-| Environment variable | `NEXT_PUBLIC_API_URL` — satu-satunya env var; tidak ada secret di client-side |
+| Aspek            | Implementasi                                                     |
+| ---------------- | ---------------------------------------------------------------- |
+| XSS prevention   | React auto-escaping; no `dangerouslySetInnerHTML`                |
+| Input validation | Client-side sebagai UX aid; backend source of truth              |
+| File upload      | Validasi MIME (JPG/PNG) + size (5MB) sebelum upload              |
+| JWT handling     | Token di localStorage; auto-clear saat 401; tidak log ke console |
+| API URL          | Via `NEXT_PUBLIC_API_URL` env var, bukan hardcode                |
+| Sensitive data   | Tidak display `device_token`, `password_hash`, atau internal IDs |
+| 401 auto-handle  | `apiFetch()` di `lib/api.ts` auto-clear + redirect login         |
+| Refresh token    | Via HttpOnly cookie; `credentials: 'include'` pada auth requests |
 
 ---
 
@@ -473,70 +669,71 @@ Dashboard berkomunikasi dengan memoir. Backend API (`/api/v1/owner/*` dan `/api/
 
 ## 12. Testing Strategy
 
-| Layer           | Target                             | Approach                                                                |
-| --------------- | ---------------------------------- | ----------------------------------------------------------------------- |
-| Component       | shadcn/ui components, forms, cards | Vitest + React Testing Library                                          |
-| Page            | Routing, data display, filters     | E2E (Playwright) or integration tests                                   |
-| Template editor | Konva canvas interaction           | Manual testing (canvas sulit di-automate); visual regression screenshot |
-| Auth flow       | Login, redirect, token refresh     | Integration test (mock API, test redirect chain)                        |
-| API integration | Error handling, response mapping   | MSW (Mock Service Worker) untuk mock API responses                      |
-| Form validation | Zod schemas, submit error display  | Unit test Zod schemas + RTL render tests                                |
+| Layer           | Target                             | Approach                                  |
+| --------------- | ---------------------------------- | ----------------------------------------- |
+| Component       | shadcn/ui components, forms, cards | Vitest + React Testing Library            |
+| Page            | Routing, data display, filters     | E2E or integration tests                  |
+| Template editor | Konva canvas interaction           | Manual testing (canvas sulit di-automate) |
+| Auth flow       | Login, redirect, token refresh     | Integration test                          |
+| API integration | Error handling, response mapping   | Mock API tests                            |
 
 ---
 
 ## 13. Deployment
 
-> Strategi deployment platform-wide → lihat [PRD-00 §11](./PRD-00-master.md).
-
-| Aspek            | Detail                                                              |
-| ---------------- | ------------------------------------------------------------------- |
-| Platform         | **Vercel** (Next.js native support)                                 |
-| Build            | `npm run build` → automatik oleh Vercel                             |
-| Preview          | Vercel preview deployments per PR / branch                          |
-| Environment vars | `NEXT_PUBLIC_API_URL` — backend API base URL (satu-satunya env var) |
-| Domain           | Terpisah dari admin dashboard (PRD-03)                              |
-| Proxy (dev)      | `next.config.ts` rewrites `/api/v1/*` → backend URL (dev only)      |
+| Aspek            | Detail                                       |
+| ---------------- | -------------------------------------------- |
+| Platform         | **Vercel** (Next.js native support)          |
+| Build            | `npm run build` → automatik oleh Vercel      |
+| Preview          | Vercel preview deployments per PR            |
+| Environment vars | `NEXT_PUBLIC_API_URL` — backend API base URL |
+| Domain           | Terpisah dari admin dashboard                |
 
 ---
 
 ## 14. Business Rules & Edge Cases
 
-> Business rules lengkap (transaksi, subscription, withdrawal, template, kiosk) → lihat [PRD-01 §7](./PRD-01-backend-api.md).
->
-> Berikut **frontend-specific UI rules** yang harus diimplementasikan:
-
-| Area                          | Frontend Rule                                                                                                                     |
+| Area                          | Rule                                                                                                                              |
 | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| **Data isolation**            | Semua query di backend di-scope by `owner_id` dari JWT, owner tidak bisa akses data owner lain                                    |
 | **Subscription expired**      | Halaman operasional (kiosks, templates) menampilkan banner lock + tombol disabled. Owner hanya bisa akses wallet dan subscription |
-| **Max kiosks**                | Tombol "Tambah Kiosk" disabled saat jumlah kiosk aktif ≥ `plan.max_kiosks`; tooltip "Upgrade plan untuk menambah kiosk"           |
-| **Template sync delay**       | Tampilkan note di editor: "Perubahan template terlihat di kiosk setelah sync ulang (startup berikutnya / manual sync)"            |
-| **File upload**               | Validasi client-side: max 5MB, JPG/PNG only; tampilkan error inline sebelum upload                                                |
-| **Immutable price snapshot**  | Transaksi detail menampilkan harga saat transaksi — label "Harga saat transaksi" untuk menghindari konfusi                        |
-| **Single PENDING withdrawal** | Tombol withdrawal disabled + tooltip "Masih ada withdrawal yang sedang diproses" jika ada PENDING                                 |
-| **Photo slot minimum**        | Disable delete button pada photo_slot terakhir; tooltip "Template wajib minimal 1 photo slot"                                     |
-| **Template delete guard**     | Saat 409 CONFLICT → toast "Template tidak bisa dihapus karena sudah digunakan. Nonaktifkan saja."                                 |
-| **Price change note**         | Note di kiosk edit: "Perubahan harga berlaku untuk transaksi baru. Harga lama tersimpan di transaksi yang sudah ada."             |
+| **Max kiosks**                | Tombol "Tambah Kiosk" disabled saat jumlah kiosk aktif ≥ `plan.max_kiosks`                                                        |
+| **Template sync delay**       | Perubahan template belum terasa di kiosk sampai sync ulang — tampilkan note di editor                                             |
+| **File upload**               | Validasi client-side: max 5MB, JPG/PNG only. Apply juga untuk element `image` uploads                                             |
+| **Immutable price snapshot**  | Transaksi menyimpan harga pada saat transaksi — display di detail sebagai "Harga saat transaksi"                                  |
+| **Single PENDING withdrawal** | Tombol withdrawal disabled jika ada withdrawal PENDING; tooltip menjelaskan                                                       |
+| **Photo slot minimum**        | Template wajib minimal 1 `photo_slot` — tolak delete yang terakhir                                                                |
+| **Unique `captureOrder`**     | Setiap `photo_slot` wajib punya `captureOrder` (integer), tidak boleh duplikat dalam template                                     |
+| **Template delete guard**     | Tolak delete template yang punya transaksi (409 CONFLICT); sarankan nonaktifkan                                                   |
 
 ---
 
 ## 15. Risks & Mitigations
 
-> Risks platform-wide → lihat [PRD-00 §12](./PRD-00-master.md).
->
-> Berikut risks **spesifik frontend Owner Dashboard**:
-
-| Risk                                 | Likelihood | Impact | Mitigasi                                                                          |
-| ------------------------------------ | ---------- | ------ | --------------------------------------------------------------------------------- |
-| Konva SSR incompatibility            | LOW        | HIGH   | Dynamic import `ssr: false` sudah diimplementasi; tested                          |
-| Template editor slow (banyak elemen) | MEDIUM     | MEDIUM | Limit elemen per template (max 50); Konva layer caching; throttle transformer     |
-| Token expiry mid-session (editor)    | MEDIUM     | MEDIUM | `apiFetch` auto-refresh; save-on-blur sebelum token expire; 401 redirect graceful |
-| Browser compatibility (Canvas API)   | LOW        | MEDIUM | Konva cross-browser tested; minimum Chrome 90+, Firefox 90+, Safari 15+           |
-| Large file upload timeout            | LOW        | LOW    | Client-side size validation (5MB); progress indicator di UI                       |
-| TanStack Query cache stale data      | LOW        | MEDIUM | `staleTime` per query type; `invalidateQueries` setelah setiap mutation           |
+| Risk                                      | Likelihood | Impact | Mitigasi                                                         |
+| ----------------------------------------- | ---------- | ------ | ---------------------------------------------------------------- |
+| Konva SSR incompatibility                 | LOW        | HIGH   | Dynamic import `ssr: false` sudah diimplementasi                 |
+| Template editor slow dengan banyak elemen | MEDIUM     | MEDIUM | Limit elemen per template (max 50); Konva caching                |
+| Backend API belum ready saat integration  | MEDIUM     | HIGH   | MSW / API mock layer; backend PRD sudah final                    |
+| Token expiry mid-session                  | MEDIUM     | LOW    | `apiFetch` auto-refresh; fallback redirect login saat 401        |
+| Large file upload timeout                 | LOW        | LOW    | Client-side size validation (5MB); progress indicator            |
+| Browser compatibility (Canvas API)        | LOW        | MEDIUM | Konva cross-browser; minimum Chrome 90+, Firefox 90+, Safari 15+ |
 
 ---
 
-## 16. Roadmap
+## 16. Open Issues
+
+| ID    | Issue                    | Impacted Features         | Status                                                                                             |
+| ----- | ------------------------ | ------------------------- | -------------------------------------------------------------------------------------------------- |
+| OI-01 | Photo slot capture order | FEAT-OD-04.3, 04.4        | ✅ **Resolved:** `captureOrder` field terpisah di JSONB properties                                 |
+| OI-02 | Payment Gateway          | FEAT-OD-01.2, 07.1, 07.2  | ✅ **Resolved:** Xendit                                                                            |
+| DF-01 | Data fetching library    | Semua features fetch data | ✅ **Resolved: TanStack Query** (mutation-heavy dashboard, built-in optimistic updates, devtools)  |
+| DF-02 | Form library             | FEAT-OD-03.2, 06.2, 04.3  | ✅ **Resolved: Zod + react-hook-form** (backend Zod alignment, shadcn/ui integration, performance) |
+| DF-03 | Auth token storage       | Semua API calls           | ✅ **Resolved:** localStorage                                                                      |
+
+---
+
+## 17. Roadmap
 
 ### MVP (v1.0) — UI Complete ✅
 
@@ -568,11 +765,10 @@ Dashboard berkomunikasi dengan memoir. Backend API (`/api/v1/owner/*` dan `/api/
 
 ---
 
-## 17. Changelog
+## 18. Changelog
 
-| Tanggal    | Versi | Perubahan                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| ---------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-03-05 | 0.1   | Initial skeleton created                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| 2026-03-06 | 1.0   | Full draft — synthesized dari referensi frontend (reference3/PRD.md, reference3/FEATURES.md, reference1/memoir_APP_owner-dashboard.md) dan PRD-00/PRD-01 untuk alignment. OI-01 & OI-02 resolved. Context7 Next.js 16 best practices applied.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| 2026-03-06 | 1.1   | Resolved DF-01 (TanStack Query) & DF-02 (Zod + react-hook-form). Added WIP notes to API Response Shape Reference and Endpoint Mapping.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| 2026-03-08 | 1.2   | **Document cleanup.** Removed duplicate content already covered in PRD-00/PRD-01: user persona detail (→ PRD-00 §2), platform-wide non-goals (→ PRD-00 §10.2), architecture ASCII diagram (→ PRD-00 §3.1), project structure (→ codebase), API response format & field naming (→ PRD-00 §8.2), endpoint mapping (→ PRD-01 §5.2), response shapes (→ docs/api/), auth protocol details (→ PRD-01 §6). Closed all resolved Open Issues (moved to changelog). Improved: error handling with frontend-specific behavior, security with frontend-only measures, testing with MSW & form validation, deployment with proxy detail, business rules focused on UI rules, risks with TanStack Query & graceful token handling. Sections renumbered §1-§17. |
+| Tanggal    | Versi | Perubahan                                                                                                                                                                                                                                     |
+| ---------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-03-05 | 0.1   | Initial skeleton created                                                                                                                                                                                                                      |
+| 2026-03-06 | 1.0   | Full draft — synthesized dari referensi frontend (reference3/PRD.md, reference3/FEATURES.md, reference1/memoir_APP_owner-dashboard.md) dan PRD-00/PRD-01 untuk alignment. OI-01 & OI-02 resolved. Context7 Next.js 16 best practices applied. |
+| 2026-03-06 | 1.1   | Resolved DF-01 (TanStack Query) & DF-02 (Zod + react-hook-form). Added WIP notes to API Response Shape Reference (section 5.3) and Endpoint Mapping (section 5.2) — will be updated alongside backend implementation.                         |

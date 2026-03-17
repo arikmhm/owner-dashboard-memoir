@@ -3,7 +3,7 @@
 // Authentication-related API calls (login, logout, subscription, plans)
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { api, setToken, removeToken, getToken } from "./api";
+import { api, setToken, removeToken, getToken, ApiError } from "./api";
 import type {
   LoginRequest,
   LoginResponse,
@@ -63,7 +63,10 @@ export async function getSubscription(): Promise<SubscriptionResponse | null> {
       "/owner/subscription",
     );
     return res.data;
-  } catch {
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 401) {
+      throw err;
+    }
     return null;
   }
 }

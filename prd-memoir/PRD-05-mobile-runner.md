@@ -80,11 +80,9 @@ Sama dengan PRD-04 Desktop Runner:
 | NG-01 | iOS support | Android-only untuk MVP |
 | NG-02 | Login user (email/password) | Auth via device_token |
 | NG-03 | WebSocket / push notification | On-demand via button |
-| NG-04 | Auto-polling PG | Customer trigger manual |
-| NG-05 | Multi-operator PIN | Single operator per device |
-| NG-06 | Analytics di app | Data analytics di Owner Dashboard |
-| NG-07 | Server-side composite | Composite di device |
-| NG-08 | Webhook PG receiver | Polling-based |
+| NG-04 | Multi-operator PIN | Single operator per device |
+| NG-05 | Analytics di app | Data analytics di Owner Dashboard |
+| NG-06 | Server-side composite | Composite di device |
 | NG-09 | Refund otomatis | Manual di luar sistem |
 | NG-10 | Template versioning | Full dump sync |
 | NG-11 | Multi-language | Bahasa Indonesia only |

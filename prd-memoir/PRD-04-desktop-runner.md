@@ -85,12 +85,10 @@ Pengguna akhir di lokasi booth. Tidak berinteraksi langsung dengan API:
 |---|----------|--------|
 | NG-01 | Login user (email/password) di kiosk | Auth via device_token, bukan credential |
 | NG-02 | WebSocket / push notification | MVP: on-demand via button |
-| NG-03 | Auto-polling status pembayaran PG | Customer/operator trigger manual |
-| NG-04 | Customer-facing download endpoint | Customer scan QR → direct Supabase URL |
-| NG-05 | Multi-operator dengan PIN berbeda | Single operator per kiosk |
-| NG-06 | Analitik / dashboard di kiosk | Data analytics di Owner Dashboard |
-| NG-07 | Image processing server-side | Composite dilakukan di Electron |
-| NG-08 | Webhook receiver dari PG | Polling-based via button check |
+| NG-03 | Customer-facing download endpoint | Customer scan QR → direct Supabase URL |
+| NG-04 | Multi-operator dengan PIN berbeda | Single operator per kiosk |
+| NG-05 | Analitik / dashboard di kiosk | Data analytics di Owner Dashboard |
+| NG-06 | Image processing server-side | Composite dilakukan di Electron |
 | NG-09 | Refund / chargeback otomatis | Manual di luar sistem |
 | NG-10 | Template versioning / rollback | Full dump sync, no delta/history |
 | NG-11 | Multi-language UI | Bahasa Indonesia only |
@@ -491,9 +489,9 @@ total = base_price
 |------|------|
 | **CASH** | Tampilkan total → instruksi "Bayar ke kasir" → tombol "Konfirmasi Pembayaran Diterima" (operator) → `POST /kiosk/transactions` → `POST .../confirm-cash` → PAID → Processing |
 | **STATIC_QRIS** | Tampilkan QR statis + total → tombol "Konfirmasi Pembayaran Diterima" → flow sama seperti CASH |
-| **PG** | `POST /kiosk/transactions` → tampilkan QR dari `paymentUrl` + nominal → "Saya Sudah Bayar — Cek Pembayaran" → `POST .../check-payment` → PAID/PENDING/FAILED |
+| **PG** | `POST /kiosk/transactions` → render QR code dari `qrString` (QRIS dinamis) + nominal → "Saya Sudah Bayar — Cek Pembayaran" → `POST .../check-payment` → PAID/PENDING/FAILED |
 
-- PG: tidak ada auto-polling, semua on-demand via tombol
+- PG: backend menerima webhook otomatis dari Xendit untuk settlement. Kiosk trigger manual check-payment via tombol untuk membaca status terbaru dari database.
 - PG PENDING → pesan "Belum diterima", customer bisa tekan lagi
 - PG FAILED → pesan "Gagal", opsi buat transaksi baru
 - **Timeout:** N menit tanpa aksi → konfirmasi "Batalkan sesi?" → Screensaver
@@ -601,9 +599,10 @@ Semua endpoint prefix `/api/v1`. Header: `Authorization: Bearer {device_token}` 
   "data": {
     "transaction": {
       "id": "uuid", "orderId": "MEM-1740576000-a3k9", "status": "PENDING",
-      "totalAmount": 40000
+      "paymentUrl": null, "qrString": "00020101021126580...",
+      "paymentExpiresAt": "2026-03-15T12:15:00.000Z", "totalAmount": 40000
     },
-    "paymentUrl": "https://checkout.xendit.co/..."
+    "paymentUrl": null
   }
 }
 ```
@@ -810,7 +809,7 @@ Semua open issues telah diputuskan — tidak ada blocker.
 ### v2.0 — Advanced Features
 - Auto-update Electron
 - Kamera filter/effects, video booth mode
-- Webhook PG receiver (no manual check)
+- Real-time payment status via WebSocket (no manual check button)
 - Analytics dashboard di kiosk
 
 ---

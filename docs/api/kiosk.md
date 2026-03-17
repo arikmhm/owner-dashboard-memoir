@@ -48,7 +48,7 @@ No body required.
 | `kiosk.priceBaseSession`   | number  | Harga dasar per sesi (Rp)                           |
 | `kiosk.pricePerExtraPrint` | number  | Harga per extra print (Rp)                          |
 | `kiosk.priceDigitalCopy`   | number  | Harga digital copy (Rp)                             |
-| `subscriptionStatus`       | string  | `ACTIVE` / `EXPIRED` / `CANCELLED` / `GRACE_PERIOD` |
+| `subscriptionStatus`       | string  | `ACTIVE` / `PENDING_PAYMENT` / `EXPIRED` / `CANCELLED` / `GRACE_PERIOD` |
 | `gracePeriodDaysRemaining` | number  | Sisa hari grace period (0 jika ACTIVE/EXPIRED)      |
 
 ### Error Responses
@@ -198,6 +198,8 @@ Jika `totalAmount` dari client tidak sama dengan `total` server, akan dikembalik
       "status": "PENDING",
       "paymentMethod": "CASH",
       "paymentUrl": null,
+      "qrString": null,
+      "paymentExpiresAt": null,
       "printQty": 1,
       "hasDigitalCopy": false,
       "appliedBasePrice": 25000,
@@ -212,7 +214,7 @@ Jika `totalAmount` dari client tidak sama dengan `total` server, akan dikembalik
 }
 ```
 
-> Untuk `paymentMethod: "PG"`, `paymentUrl` berisi URL redirect ke halaman pembayaran Xendit.
+> Untuk `paymentMethod: "PG"`, `qrString` berisi QR code string (QRIS dinamis) yang harus di-render di kiosk. `paymentUrl` akan `null` untuk QRIS. `paymentExpiresAt` menunjukkan waktu expiry QR code (ISO 8601).
 
 ### Error Responses
 
@@ -277,7 +279,7 @@ Jika transaksi sudah berstatus `PAID`, endpoint mengembalikan transaksi yang ada
 
 ## POST `/kiosk/transactions/:id/check-payment`
 
-Cek status pembayaran PG (payment gateway). Polling endpoint yang dipanggil kiosk untuk mengecek apakah pembayaran sudah settle, expire, atau masih pending.
+Cek status pembayaran PG dari database. Read-only endpoint — tidak memanggil Xendit API. Settlement dilakukan otomatis melalui webhook Xendit (`POST /webhooks/xendit`).
 
 ### Request
 
@@ -305,20 +307,13 @@ No body required.
 }
 ```
 
-| Status Value | PG Status            | Action                                         |
-| ------------ | -------------------- | ---------------------------------------------- |
-| `PAID`       | `settlement`         | Update status→PAID, credit wallet (atomic UoW) |
-| `FAILED`     | `expire` / `cancel`  | Update status→FAILED                           |
-| `PENDING`    | `pending` / PG error | No state change                                |
+| Status Value | Description                                              |
+| ------------ | -------------------------------------------------------- |
+| `PAID`       | Pembayaran berhasil (di-settle via webhook)              |
+| `FAILED`     | Pembayaran gagal/expired (di-update via webhook)         |
+| `PENDING`    | Menunggu pembayaran — webhook belum diterima dari Xendit |
 
-### Idempotency
-
-- Jika transaksi sudah `PAID`, langsung return `{ status: "PAID" }` tanpa memanggil PG.
-- Jika transaksi sudah `FAILED`, langsung return `{ status: "FAILED" }` tanpa memanggil PG.
-
-### Timeout Handling
-
-Jika PG call gagal/timeout (5 detik), endpoint return `{ status: "PENDING" }` tanpa mengubah state transaksi.
+> **Note:** Endpoint ini hanya membaca status dari database. Settlement (update status, credit wallet, aktivasi subscription) dilakukan secara otomatis via webhook Xendit.
 
 ### Error Responses
 

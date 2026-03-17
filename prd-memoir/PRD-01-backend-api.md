@@ -2,7 +2,7 @@
 
 > **Versi:** 1.6
 > **Tanggal:** 7 Maret 2026
-> **Status:** In Progress — EPIC-01 ~ EPIC-06 Implemented
+> **Status:** In Progress — EPIC-01 ~ EPIC-07 Implemented
 > **Audiens:** Internal dev team & AI coding agents
 > **Parent:** [PRD-00-master.md](./PRD-00-master.md) (Platform Overview)
 
@@ -67,6 +67,9 @@ Backend API berbasis **Node.js + Fastify 5.x** dengan arsitektur **Clean Archite
 |                                 | Platform Config Management          | FEAT-06.3  | P0       | ✅ Done |
 |                                 | Withdrawal Approve / Reject         | FEAT-06.4  | P0       | ✅ Done |
 |                                 | Cross-owner Transaction Monitoring  | FEAT-06.5  | P0       | ✅ Done |
+| **EPIC-07: Payment Gateway**    | Xendit QRIS Dynamic (v3 API)        | FEAT-07.1  | P0       | ✅ Done |
+|                                 | Webhook Receiver (payment.capture)  | FEAT-07.2  | P0       | ✅ Done |
+|                                 | Settlement Services (shared logic)  | FEAT-07.3  | P0       | ✅ Done |
 
 ### 2.3 Non-Goals
 
@@ -76,9 +79,8 @@ Backend API berbasis **Node.js + Fastify 5.x** dengan arsitektur **Clean Archite
 
 | #     | Non-Goal                                   | Alasan                                           |
 | ----- | ------------------------------------------ | ------------------------------------------------ |
-| NG-01 | Webhook receiver dari Payment Gateway      | MVP: polling-based via button                    |
 | NG-05 | OAuth / SSO                                | MVP: email+password only                         |
-| NG-06 | Auto-renewal subscription                  | MVP: manual renewal via check-payment            |
+| NG-06 | Auto-renewal subscription                  | MVP: manual renewal; settlement via webhook      |
 | NG-08 | Image processing / compression server-side | Composite dilakukan di client (Electron/Flutter) |
 | NG-09 | Scheduled jobs / cron                      | Semua status check dilakukan lazy/on-demand      |
 
@@ -248,6 +250,7 @@ else → EXPIRED (canOperate: false)
 | `PATCH`  | `/owner/kiosks/:id`                              | Edit kiosk (nama, harga, status)          |
 | `POST`   | `/owner/kiosks/:id/generate-pairing`             | Generate pairing code baru                |
 | `GET`    | `/owner/templates`                               | List template milik owner                 |
+| `GET`    | `/owner/templates/:id`                           | Detail template + elements                |
 | `POST`   | `/owner/templates`                               | Buat template baru                        |
 | `PATCH`  | `/owner/templates/:id`                           | Edit template                             |
 | `DELETE` | `/owner/templates/:id`                           | Hapus template (guard: no transactions)   |
@@ -261,6 +264,7 @@ else → EXPIRED (canOperate: false)
 | `GET`    | `/owner/withdrawals`                             | List withdrawal (paginated)               |
 | `POST`   | `/owner/withdrawals`                             | Request withdrawal baru                   |
 | `GET`    | `/owner/subscription`                            | Subscription aktif + status               |
+| `GET`    | `/owner/subscription/plans`                      | List active subscription plans            |
 | `POST`   | `/owner/subscription`                            | Subscribe / upgrade plan                  |
 | `GET`    | `/owner/subscription/invoices`                   | Invoice history                           |
 | `POST`   | `/owner/subscription/invoices/:id/check-payment` | Cek status PG invoice                     |
@@ -377,11 +381,11 @@ POST /kiosk/pair { pairingCode: "123456" }
 
 | Rule                    | Detail                                                                                                                                                                                                                                          |
 | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **PENDING_PAYMENT**     | Subscription baru dibuat dengan status `PENDING_PAYMENT`, diaktifkan ke `ACTIVE` setelah PG settlement via check-payment. Subscription ACTIVE lama **tidak disentuh** sampai pembayaran selesai.                                                |
+| **PENDING_PAYMENT**     | Subscription baru dibuat dengan status `PENDING_PAYMENT`, diaktifkan ke `ACTIVE` setelah PG settlement via webhook Xendit. Subscription ACTIVE lama **tidak disentuh** sampai pembayaran selesai. Check-payment hanya membaca status dari DB.                                                |
 | **Lazy status**         | Dihitung on-the-fly: `now > period_end + grace_days` → EXPIRED. Tidak ada cron                                                                                                                                                                  |
 | **Grace period**        | Dari `platform_config`; kiosk masih operasi selama grace. Hanya tampil saat status `GRACE_PERIOD`                                                                                                                                               |
 | **One active**          | Satu owner maksimal 1 subscription ACTIVE (enforced app-layer)                                                                                                                                                                                  |
-| **One pending**         | Satu owner maksimal 1 subscription PENDING_PAYMENT. Harus selesaikan/bayar dulu sebelum buat yang baru (409 Conflict)                                                                                                                           |
+| **Multiple pending allowed** | Owner diperbolehkan membuat subscription baru meskipun sudah ada PENDING_PAYMENT. Di-log sebagai warning, tidak di-reject.                                                                                                                           |
 | **Safe upgrade**        | Upgrade/change plan selalu buat **subscription row baru** (PENDING_PAYMENT). Subscription lama tetap ACTIVE. Saat settlement: subscription baru ACTIVE, subscription lama CANCELLED. Saat expire: subscription baru EXPIRED, lama tetap ACTIVE. |
 | **Duplicate guard**     | Re-subscribe ke plan+period yang sama saat ACTIVE → 409 Conflict                                                                                                                                                                                |
 | **Max kiosks**          | Enforce saat create kiosk: count aktif vs `plan.max_kiosks` → 403                                                                                                                                                                               |
@@ -391,7 +395,7 @@ POST /kiosk/pair { pairingCode: "123456" }
 | **Payment redirect**    | `XenditPaymentService` set `success_redirect_url` ke `${FRONTEND_URL}/onboarding?invoice_id=${invoice.id}` — Xendit redirect user kembali ke frontend setelah bayar. `FRONTEND_URL` env optional; tanpa itu user tetap di halaman sukses Xendit |
 | **Atomic settlement**   | CheckSubscriptionPaymentUseCase: settlement (invoice PAID + subscription baru ACTIVE + subscription lama CANCELLED) dalam 1 transaction                                                                                                         |
 | **Atomic expire**       | CheckSubscriptionPaymentUseCase: expire (invoice FAILED + subscription baru EXPIRED, subscription lama tetap ACTIVE) dalam 1 transaction                                                                                                        |
-| **PG error resilience** | Jika PG.checkStatus throw error → return PENDING, no state change. Client retry aman                                                                                                                                                            |
+| **PG error resilience** | Check-payment hanya membaca DB (tidak call Xendit). Settlement errors ditangani via webhook retry.                                                                                                                                                            |
 | **GET subscription**    | Memprioritaskan subscription ACTIVE via `findActiveByUserId`. Response menyertakan field `pendingUpgrade` jika ada PENDING_PAYMENT                                                                                                              |
 
 ### 7.3 Withdrawal

@@ -156,7 +156,7 @@ Tier dan harga dikonfigurasi oleh platform admin via dashboard (tidak hardcode).
 - Satu owner hanya boleh memiliki **satu subscription ACTIVE** pada satu waktu
 - Subscription dibuat dengan status **`PENDING_PAYMENT`** — belum bisa digunakan sampai pembayaran dikonfirmasi
 - **Upgrade/change plan aman**: saat owner upgrade, backend membuat **subscription row baru** (`PENDING_PAYMENT`) tanpa menyentuh subscription ACTIVE yang sudah ada. Subscription lama tetap berjalan selama pembayaran plan baru belum selesai.
-- Hanya boleh ada **1 pending subscription** per owner. Jika sudah ada PENDING_PAYMENT, owner harus selesaikan/bayar dulu sebelum bisa subscribe lagi.
+- Diperbolehkan membuat subscription baru meskipun sudah ada PENDING_PAYMENT (di-log sebagai warning, tidak di-reject).
 - **Status dihitung secara lazy** tidak ada cron job. Backend menghitung status saat request masuk:
   - `PENDING_PAYMENT` → menunggu pembayaran (kiosk tidak bisa beroperasi **untuk subscription ini**)
   - `now ≤ current_period_end` → **ACTIVE**
@@ -166,7 +166,7 @@ Tier dan harga dikonfigurasi oleh platform admin via dashboard (tidak hardcode).
 - Re-subscribe ke plan+period yang sama saat ACTIVE ditolak (409 Conflict)
 - Enforcement `max_kiosks`: saat owner tambah kiosk, backend cek jumlah kiosk aktif vs limit plan
 - Grace period dikonfigurasi via `platform_config` (key: `grace_period_days`), hanya ditampilkan saat status `GRACE_PERIOD`
-- PG error saat check-payment → return PENDING, no state change (safe retry)
+- Settlement dilakukan via webhook Xendit. Check-payment hanya membaca status dari database (read-only).
 - **GET /subscription** selalu memprioritaskan subscription ACTIVE. Field `pendingUpgrade` ditambahkan untuk menunjukkan jika ada pending upgrade.
 
 ### 6.4 Metode Pembayaran Booth (3 jenis)
@@ -175,7 +175,7 @@ Tier dan harga dikonfigurasi oleh platform admin via dashboard (tidak hardcode).
 | --------------- | ----------------------------------------------------- | -------------------------- |
 | **CASH**        | Bayar tunai ke operator, konfirmasi manual via tombol | ❌ Tidak (setelah startup) |
 | **STATIC_QRIS** | Scan QR statis, konfirmasi manual via tombol          | ❌ Tidak (setelah startup) |
-| **PG (Xendit)** | E-wallet / transfer bank via payment gateway          | ✅ Ya                      |
+| **PG (Xendit)** | QRIS dinamis via Xendit Payment Request v3 API        | ✅ Ya                      |
 
 ### 6.5 Wallet & Withdrawal
 
@@ -193,23 +193,22 @@ Owner pilih plan + billing period
         ▼
 Backend buat subscription BARU (PENDING_PAYMENT) + invoice (PENDING)
         │  └─ Subscription ACTIVE yang lama TIDAK disentuh
-        │  └─ Guard: tolak jika sudah ada PENDING_PAYMENT (409 Conflict)
+        │  └─ Warning jika sudah ada PENDING_PAYMENT (diperbolehkan, tidak di-reject)
         │  └─ Operasi DB dalam UnitOfWork transaction
         ▼
-PG call (di luar transaction) → dapatkan payment_url
+PG call (di luar transaction) → dapatkan QR string (QRIS dinamis via Xendit v3 API)
         │  └─ Jika PG gagal: subscription tetap PENDING_PAYMENT, client retry via check-payment
-        │  └─ success_redirect_url di-set ke ${FRONTEND_URL}/onboarding?invoice_id=${invoice.id}
         ▼
-Owner bayar via PG → diarahkan ke payment_url
+Owner scan QR code untuk bayar
+        │
+        ├─── Jalur 1: Webhook otomatis
+        │    Xendit kirim POST /webhooks/xendit → backend auto-settle
+        │
+        ├─── Jalur 2: Manual check (button)
+        │    Owner klik "Cek Status" → POST /subscription/invoices/:id/check-payment
         │
         ▼
-Xendit redirect ke /onboarding?invoice_id=<uuid> (atau owner manual cek di dashboard)
-        │
-        ▼
-Frontend call POST /subscription/invoices/:id/check-payment
-        │
-        ▼
-Backend query Xendit API:
+Backend settle payment:
   ├─ settlement → Atomic (1 transaction):
   │    1. Invoice PAID
   │    2. Subscription baru ACTIVE
@@ -347,7 +346,7 @@ Setiap client harus handle error codes dari backend secara konsisten:
 | ----------------------- | ----------------------------- | ------------------------------------------------ |
 | Monorepo vs Multi-repo? | **Multi-repo**                | Repo terpisah per app, fully independent deploy  |
 | Registration model?     | **Admin-only**                | Owner tidak self-register, admin buat akun       |
-| Payment status check?   | **On-demand (manual button)** | Tidak ada webhook/auto-polling di MVP            |
+| Payment status check?   | **Webhook + manual button**   | Xendit webhook auto-settle + manual check button |
 | Subscription status?    | **Lazy-computed**             | Tidak ada cron job, status dihitung saat request |
 | Kiosk session flow?     | **Foto dulu, bayar kemudian** | Customer "coba dulu" melihat hasil sebelum bayar |
 | Currency?               | **IDR only**                  | Single-currency, `bigint` tanpa decimal          |
@@ -377,7 +376,7 @@ Setiap client harus handle error codes dari backend secara konsisten:
 - ✅ Semua 5 komponen (Backend API, Owner Dashboard, Super Admin Dashboard, Desktop Runner, Mobile Runner)
 - ✅ Subscription tiered dengan 2 periode billing (monthly / yearly)
 - ✅ 3 metode pembayaran booth: CASH, STATIC_QRIS, PG (Xendit)
-- ✅ Konfirmasi pembayaran manual via button (tidak ada webhook otomatis)
+- ✅ Konfirmasi pembayaran via webhook otomatis (Xendit) + manual check button
 - ✅ Digital copy dengan upload ke Supabase Storage + QR download
 - ✅ Withdrawal manual (owner request → admin approve)
 - ✅ Sync template kiosk via polling saat startup + manual sync

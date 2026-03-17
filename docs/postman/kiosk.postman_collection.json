@@ -26,7 +26,7 @@
               "pm.test('has kiosk config', () => {",
               "  const d = pm.response.json().data;",
               "  pm.expect(d.kiosk.id).to.be.a('string');",
-              "  pm.expect(d.subscriptionStatus).to.be.oneOf(['ACTIVE','EXPIRED','CANCELLED','GRACE_PERIOD']);",
+              "  pm.expect(d.subscriptionStatus).to.be.oneOf(['ACTIVE','PENDING_PAYMENT','EXPIRED','CANCELLED','GRACE_PERIOD']);",
               "  pm.expect(d.gracePeriodDaysRemaining).to.be.a('number');",
               "});"
             ],
@@ -162,10 +162,12 @@
           "script": {
             "exec": [
               "pm.test('201 Created', () => pm.response.to.have.status(201));",
-              "pm.test('PG transaction with paymentUrl', () => {",
+              "pm.test('PG transaction with QRIS qrString', () => {",
               "  const d = pm.response.json().data;",
               "  pm.expect(d.transaction.paymentMethod).to.eql('PG');",
-              "  pm.expect(d.paymentUrl).to.be.a('string');",
+              "  pm.expect(d.transaction.qrString).to.be.a('string');",
+              "  pm.expect(d.transaction.paymentExpiresAt).to.be.a('string');",
+              "  pm.expect(d.transaction.paymentUrl).to.be.null;",
               "  pm.collectionVariables.set('pgTransactionId', d.transaction.id);",
               "});"
             ],
@@ -253,7 +255,7 @@
             "exec": [
               "pm.test('400 Price Mismatch', () => {",
               "  pm.response.to.have.status(400);",
-              "  pm.expect(pm.response.json().error.code).to.eql('PRICE_MISMATCH');",
+              "  pm.expect(pm.response.json().error).to.eql('PRICE_MISMATCH');",
               "});"
             ],
             "type": "text/javascript"
