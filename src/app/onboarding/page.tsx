@@ -1,10 +1,10 @@
 "use client";
 
-import { Suspense, useState, useEffect, useCallback, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/components/auth-provider";
-import { formatRupiah, formatDateTime } from "@/lib/format";
+import { formatRupiah } from "@/lib/format";
 import { QRCodeSVG } from "qrcode.react";
 import {
   createSubscription,
@@ -12,6 +12,7 @@ import {
   getPlans,
 } from "@/lib/auth-api";
 import { ApiError } from "@/lib/api";
+import { useCountdown } from "@/hooks/use-countdown";
 import type { SubscriptionPlan, BillingPeriod } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,27 +22,17 @@ import {
   XCircle,
   RefreshCw,
   AlertCircle,
+  Timer,
 } from "lucide-react";
 
 type OnboardingStep = "select-plan" | "checking-payment";
 
 export default function OnboardingPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center bg-white">
-          <Loader2 className="h-5 w-5 animate-spin text-zinc-400" />
-        </div>
-      }
-    >
-      <OnboardingContent />
-    </Suspense>
-  );
+  return <OnboardingContent />;
 }
 
 function OnboardingContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const {
     user,
     isLoading: authLoading,
@@ -49,7 +40,7 @@ function OnboardingContent() {
     refreshSubscription,
   } = useAuth();
 
-  const hasActiveSubscription =
+  const hasActiveSub =
     subscriptionStatus === "ACTIVE" || subscriptionStatus === "GRACE_PERIOD";
 
   const [step, setStep] = useState<OnboardingStep>("select-plan");
@@ -63,6 +54,8 @@ function OnboardingContent() {
     "idle" | "checking" | "paid" | "not-paid" | "failed"
   >("idle");
 
+  const { display: countdown, isExpired } = useCountdown(pendingExpiresAt);
+
   // ── Fetch plans via TanStack Query ───────────────────────────────────────
 
   const {
@@ -73,7 +66,7 @@ function OnboardingContent() {
     queryKey: ["subscription-plans"],
     queryFn: getPlans,
     enabled: !!user,
-    staleTime: 5 * 60 * 1000, // plans rarely change
+    staleTime: 5 * 60 * 1000,
     retry: 2,
   });
 
@@ -85,16 +78,12 @@ function OnboardingContent() {
       const { invoice } = result;
 
       if (invoice.qrString) {
-        // Prefer inline QRIS display over redirect
         setPendingInvoiceId(invoice.id);
         setPendingQrString(invoice.qrString);
         setPendingExpiresAt(invoice.paymentExpiresAt ?? null);
         setStep("checking-payment");
-      } else if (invoice.paymentUrl) {
-        // Fallback: redirect to Xendit payment page
-        window.location.href = invoice.paymentUrl;
       } else {
-        // Neither available (PG call failed) — show checking-payment with fallback
+        // QR generation failed on backend — show fallback
         setPendingInvoiceId(invoice.id);
         setStep("checking-payment");
       }
@@ -117,26 +106,12 @@ function OnboardingContent() {
     },
   });
 
-  // Track whether auto-check has already been triggered (prevents re-fire)
-  const autoCheckTriggered = useRef(false);
-
-  // Check if returning from payment gateway
-  // Backend redirect URL uses invoice UUID directly in ?invoice_id=<UUID>
-  const invoiceIdFromUrl = searchParams.get("invoice_id");
-
+  // Redirect if already has active subscription
   useEffect(() => {
-    if (invoiceIdFromUrl) {
-      setPendingInvoiceId(invoiceIdFromUrl);
-      setStep("checking-payment");
-    }
-  }, [invoiceIdFromUrl]);
-
-  // Redirect if already has active subscription (but not if checking payment)
-  useEffect(() => {
-    if (!authLoading && hasActiveSubscription && !invoiceIdFromUrl) {
+    if (!authLoading && hasActiveSub) {
       router.replace("/");
     }
-  }, [authLoading, hasActiveSubscription, invoiceIdFromUrl, router]);
+  }, [authLoading, hasActiveSub, router]);
 
   const handleSelectPlan = useCallback(
     (planId: string) => {
@@ -162,8 +137,7 @@ function OnboardingContent() {
       if (result.status === "PAID") {
         setPaymentStatus("paid");
         await refreshSubscription();
-        // Use full page navigation to force AuthProvider re-init with fresh
-        // subscription state — avoids race conditions with client-side routing
+        // Hard reload to force AuthProvider re-init with fresh subscription
         setTimeout(() => {
           window.location.href = "/";
         }, 1500);
@@ -189,24 +163,7 @@ function OnboardingContent() {
     setPendingExpiresAt(null);
     setPaymentStatus("idle");
     setError(null);
-    autoCheckTriggered.current = false;
-    router.replace("/onboarding");
-  }, [router]);
-
-  // Auto-check payment status only when returning from Xendit redirect
-  // (indicated by ?invoice_id= in URL). For inline QRIS, user clicks manually.
-  useEffect(() => {
-    if (
-      step === "checking-payment" &&
-      pendingInvoiceId &&
-      invoiceIdFromUrl &&
-      paymentStatus === "idle" &&
-      !autoCheckTriggered.current
-    ) {
-      autoCheckTriggered.current = true;
-      handleCheckPayment();
-    }
-  }, [step, pendingInvoiceId, invoiceIdFromUrl, paymentStatus, handleCheckPayment]);
+  }, []);
 
   // Loading state
   if (authLoading) {
@@ -222,6 +179,21 @@ function OnboardingContent() {
 
   // ── Step 2: Payment Check ──────────────────────────────────────────────
   if (step === "checking-payment") {
+    const showQr =
+      pendingQrString &&
+      !isExpired &&
+      paymentStatus !== "paid" &&
+      paymentStatus !== "failed";
+
+    const showExpired =
+      isExpired && paymentStatus !== "paid" && paymentStatus !== "failed";
+
+    const showQrFallback =
+      !pendingQrString &&
+      !isExpired &&
+      paymentStatus !== "paid" &&
+      paymentStatus !== "failed";
+
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center px-4 py-16">
         <div className="w-full max-w-md space-y-8 text-center">
@@ -230,61 +202,78 @@ function OnboardingContent() {
               memoir.
             </p>
             <h1 className="text-2xl font-semibold text-zinc-950 tracking-tight">
-              Cek Status Pembayaran
+              {paymentStatus === "paid"
+                ? "Pembayaran Berhasil"
+                : "Selesaikan Pembayaran"}
             </h1>
-            <p className="text-sm text-zinc-500">
-              Setelah menyelesaikan pembayaran, tekan tombol di bawah untuk
-              memverifikasi.
-            </p>
+            {paymentStatus !== "paid" && paymentStatus !== "failed" && (
+              <p className="text-sm text-zinc-500">
+                Scan QR code menggunakan e-wallet atau mobile banking, lalu cek
+                status pembayaran.
+              </p>
+            )}
           </div>
 
-          {/* QRIS QR Code display */}
-          {pendingQrString &&
-            paymentStatus !== "paid" &&
-            paymentStatus !== "failed" && (
-              <div className="space-y-3">
-                <div className="inline-flex rounded-xl border border-zinc-200 bg-white p-4">
-                  <QRCodeSVG value={pendingQrString} size={200} level="M" />
-                </div>
-                <p className="text-xs text-zinc-500">
-                  Scan QR code di atas menggunakan aplikasi e-wallet atau mobile
-                  banking Anda.
-                </p>
-                {pendingExpiresAt && (
-                  <p className="text-xs text-zinc-400">
-                    Bayar sebelum{" "}
-                    <span className="font-medium text-zinc-600">
-                      {formatDateTime(pendingExpiresAt)}
-                    </span>
-                  </p>
-                )}
+          {/* QRIS QR Code + countdown */}
+          {showQr && (
+            <div className="space-y-3">
+              <div className="inline-flex rounded-xl border border-zinc-200 bg-white p-4">
+                <QRCodeSVG value={pendingQrString} size={200} level="M" />
               </div>
-            )}
+              {pendingExpiresAt && (
+                <div className="flex items-center justify-center gap-2 text-sm">
+                  <Timer className="size-4 text-zinc-400" />
+                  <span className="font-mono font-medium tabular-nums text-zinc-700">
+                    {countdown}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
 
-          {/* Fallback: QR generation failed — no qrString and not returning from Xendit */}
-          {!pendingQrString &&
-            !invoiceIdFromUrl &&
-            paymentStatus !== "paid" &&
-            paymentStatus !== "failed" && (
-              <div className="flex flex-col items-center gap-3 rounded-lg border border-yellow-200 bg-yellow-50 p-4">
-                <AlertCircle className="h-8 w-8 text-yellow-600" />
-                <div className="space-y-1 text-center">
-                  <p className="text-sm font-medium text-yellow-800">
-                    QR code pembayaran tidak tersedia
-                  </p>
-                  <p className="text-xs text-yellow-600">
-                    Terjadi kendala saat membuat QR code. Silakan coba lagi.
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleBackToPlans}
-                >
-                  Kembali ke Pilihan Plan
-                </Button>
+          {/* QR expired */}
+          {showExpired && (
+            <div className="flex flex-col items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-6">
+              <XCircle className="h-10 w-10 text-red-500" />
+              <div>
+                <p className="text-sm font-medium text-red-800">
+                  QR code sudah kadaluarsa
+                </p>
+                <p className="text-xs text-red-600 mt-1">
+                  Silakan pilih plan kembali untuk membuat QR baru.
+                </p>
               </div>
-            )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleBackToPlans}
+              >
+                Kembali ke Pilihan Plan
+              </Button>
+            </div>
+          )}
+
+          {/* Fallback: QR generation failed */}
+          {showQrFallback && (
+            <div className="flex flex-col items-center gap-3 rounded-lg border border-yellow-200 bg-yellow-50 p-4">
+              <AlertCircle className="h-8 w-8 text-yellow-600" />
+              <div className="space-y-1 text-center">
+                <p className="text-sm font-medium text-yellow-800">
+                  QR code pembayaran tidak tersedia
+                </p>
+                <p className="text-xs text-yellow-600">
+                  Terjadi kendala saat membuat QR code. Silakan coba lagi.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleBackToPlans}
+              >
+                Kembali ke Pilihan Plan
+              </Button>
+            </div>
+          )}
 
           {/* Status display */}
           <div className="space-y-4">
@@ -334,37 +323,38 @@ function OnboardingContent() {
 
           {/* Actions */}
           <div className="space-y-3">
-            {paymentStatus !== "paid" && paymentStatus !== "failed" && (
-              <Button
-                onClick={handleCheckPayment}
-                disabled={paymentStatus === "checking"}
-                className="w-full bg-zinc-950 text-white hover:bg-zinc-800"
-              >
-                {paymentStatus === "checking" ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Mengecek...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    Cek Status Pembayaran
-                  </>
-                )}
-              </Button>
-            )}
+            {paymentStatus !== "paid" &&
+              paymentStatus !== "failed" &&
+              !isExpired && (
+                <Button
+                  onClick={handleCheckPayment}
+                  disabled={paymentStatus === "checking"}
+                  className="w-full bg-zinc-950 text-white hover:bg-zinc-800"
+                >
+                  {paymentStatus === "checking" ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Mengecek...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Cek Status Pembayaran
+                    </>
+                  )}
+                </Button>
+              )}
 
-            {(paymentStatus === "failed" ||
-              paymentStatus === "not-paid" ||
-              paymentStatus === "idle") && (
-              <Button
-                variant="outline"
-                onClick={handleBackToPlans}
-                className="w-full"
-              >
-                Kembali ke Pilihan Plan
-              </Button>
-            )}
+            {(paymentStatus === "failed" || paymentStatus === "not-paid") &&
+              !isExpired && (
+                <Button
+                  variant="outline"
+                  onClick={handleBackToPlans}
+                  className="w-full"
+                >
+                  Kembali ke Pilihan Plan
+                </Button>
+              )}
           </div>
         </div>
       </div>

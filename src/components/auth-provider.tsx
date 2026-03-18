@@ -16,7 +16,7 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { getToken, removeToken, ApiError } from "@/lib/api";
+import { getToken, setToken, removeToken, ApiError } from "@/lib/api";
 import {
   login as apiLogin,
   logout as apiLogout,
@@ -210,19 +210,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // 4. Authenticated + on onboarding + HAS active subscription
     //    → redirect to dashboard (no need to onboard again)
-    //    EXCEPT when returning from payment gateway (invoice_id in URL)
     if (
       isAuthenticated &&
       isAuthOnlyRoute(pathname) &&
       hasActiveSubscription(subscriptionStatus)
     ) {
-      const hasInvoiceParam =
-        typeof window !== "undefined" &&
-        new URLSearchParams(window.location.search).has("invoice_id");
-      if (!hasInvoiceParam) {
-        router.replace("/");
-        return;
-      }
+      router.replace("/");
+      return;
     }
   }, [isLoading, isAuthenticated, subscriptionStatus, pathname, router]);
 
@@ -230,7 +224,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const handleLogin = useCallback(
     async (credentials: LoginRequest) => {
-      const { user: authUser } = await apiLogin(credentials);
+      const { user: authUser, accessToken } = await apiLogin(credentials);
 
       // Fetch subscription BEFORE setting user state.
       // Setting user first would make isAuthenticated=true, which triggers
@@ -245,7 +239,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           subStatus = subResponse.subscriptionStatus;
         }
       } catch {
-        // Non-blocking — treat as no subscription
+        // Non-blocking — treat as no subscription.
+        // If getSubscription hit a 401, apiFetch already called removeToken()
+        // and scheduled window.location.href = "/login". Restore the token so
+        // the redirect (or page reload) lands with valid auth state.
+        if (!getToken()) {
+          setToken(accessToken);
+        }
       }
 
       // Batch all state updates synchronously (React 18+ automatic batching)
@@ -260,14 +260,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setUser(authUser);
 
-      // Redirect based on subscription status
-      if (hasActiveSubscription(subStatus)) {
-        router.replace("/");
-      } else {
-        router.replace("/onboarding");
-      }
+      // Navigate to the appropriate page.
+      // Use window.location.href (full reload) instead of router.replace to:
+      // 1. Override any pending hard redirect to /login from apiFetch's 401 handler
+      // 2. Ensure clean state initialization on the destination page
+      const destination = hasActiveSubscription(subStatus) ? "/" : "/onboarding";
+      window.location.href = destination;
     },
-    [router],
+    [],
   );
 
   const handleLogout = useCallback(() => {

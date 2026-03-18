@@ -97,7 +97,6 @@ export interface SubscriptionInvoice {
   billingPeriod: BillingPeriod;
   status: "PENDING" | "PAID" | "FAILED";
   paymentMethod: string;
-  paymentUrl: string | null;
   qrString: string | null;
   orderId: string;
   periodStart: string;
@@ -152,7 +151,6 @@ export interface Transaction {
   orderId: string;
   status: TxStatus;
   paymentMethod: PaymentMethod;
-  paymentUrl: string | null;
   printQty: number;
   hasDigitalCopy: boolean;
   appliedBasePrice: number;

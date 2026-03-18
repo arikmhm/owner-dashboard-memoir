@@ -15,10 +15,10 @@ import {
   ChevronRight,
   RefreshCw,
   Loader2,
-  ExternalLink,
   CreditCard,
   AlertCircle,
   Clock,
+  Timer,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -48,8 +48,14 @@ import {
   checkInvoicePayment,
 } from "@/hooks/use-subscription";
 import { ApiError } from "@/lib/api";
+import { useCountdown } from "@/hooks/use-countdown";
 import { toast } from "sonner";
-import type { BillingPeriod, SubscriptionPlan } from "@/lib/types";
+import type {
+  BillingPeriod,
+  Subscription,
+  SubscriptionInvoice,
+  SubscriptionPlan,
+} from "@/lib/types";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -141,20 +147,16 @@ export default function SubscriptionPage() {
           billingPeriod,
         });
 
-        if (result.invoice.paymentUrl) {
-          window.location.href = result.invoice.paymentUrl;
+        setUpgradeOpen(false);
+        if (result.invoice.qrString) {
+          toast("Scan QR code di bawah untuk menyelesaikan pembayaran.", {
+            icon: <CreditCard className="size-4 text-zinc-500" />,
+          });
         } else {
-          setUpgradeOpen(false);
-          if (result.invoice.qrString) {
-            toast("Scan QR code di bawah untuk menyelesaikan pembayaran.", {
-              icon: <CreditCard className="size-4 text-zinc-500" />,
-            });
-          } else {
-            toast.success("Subscription berhasil dibuat!");
-          }
-          await refreshSubscription();
-          refreshInvoices();
+          toast.success("Subscription berhasil dibuat!");
         }
+        await refreshSubscription();
+        refreshInvoices();
       } catch (err) {
         if (err instanceof ApiError) {
           toast.error(err.message || "Gagal membuat subscription.");
@@ -349,94 +351,13 @@ export default function SubscriptionPage() {
 
       {/* Pending Upgrade Banner */}
       {pendingUpgrade && (
-        <div className="border border-yellow-200 rounded-xl bg-yellow-50 overflow-hidden">
-          <div className="px-6 py-4 space-y-3">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex items-center gap-2">
-                <Clock className="size-4 text-yellow-600 shrink-0" />
-                <div className="space-y-0.5">
-                  <p className="text-sm font-medium text-yellow-800">
-                    Upgrade ke{" "}
-                    {pendingUpgradePlan?.name ?? pendingUpgrade.planId} menunggu
-                    pembayaran
-                  </p>
-                  <p className="text-xs text-yellow-600">
-                    {BILLING_PERIOD_LABEL[pendingUpgrade.billingPeriod]} ·{" "}
-                    {formatRupiah(pendingUpgrade.pricePaid)}/periode — Plan
-                    aktif saat ini tetap berjalan.
-                  </p>
-                </div>
-              </div>
-              <Badge className="text-[10px] shrink-0 bg-yellow-100 text-yellow-700">
-                Menunggu Pembayaran
-              </Badge>
-            </div>
-
-            {/* QRIS QR Code for pending upgrade */}
-            {pendingUpgradeInvoice?.qrString &&
-              !pendingUpgradeInvoice.paymentUrl && (
-                <div className="flex items-start gap-4 pt-1">
-                  <div className="rounded-lg border border-yellow-300 bg-white p-2">
-                    <QRCodeSVG
-                      value={pendingUpgradeInvoice.qrString}
-                      size={120}
-                      level="M"
-                    />
-                  </div>
-                  <div className="text-xs text-yellow-700 space-y-1">
-                    <p>
-                      Scan QR code untuk membayar via e-wallet atau mobile
-                      banking.
-                    </p>
-                    {pendingUpgradeInvoice.paymentExpiresAt && (
-                      <p className="text-yellow-600">
-                        Bayar sebelum{" "}
-                        <span className="font-medium">
-                          {formatDateTime(
-                            pendingUpgradeInvoice.paymentExpiresAt,
-                          )}
-                        </span>
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-            <div className="flex gap-2">
-              {pendingUpgradeInvoice?.paymentUrl && (
-                <a
-                  href={pendingUpgradeInvoice.paymentUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <Button
-                    size="sm"
-                    className="bg-yellow-700 text-white hover:bg-yellow-800 text-xs gap-1.5"
-                  >
-                    <ExternalLink className="size-3" />
-                    Bayar Sekarang
-                  </Button>
-                </a>
-              )}
-              {pendingUpgradeInvoice && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-xs gap-1.5 border-yellow-300 text-yellow-800 hover:bg-yellow-100"
-                  onClick={() => handleCheckPayment(pendingUpgradeInvoice.id)}
-                  disabled={checkingInvoiceId === pendingUpgradeInvoice.id}
-                >
-                  {checkingInvoiceId === pendingUpgradeInvoice.id ? (
-                    <Loader2 className="size-3 animate-spin" />
-                  ) : (
-                    <RefreshCw className="size-3" />
-                  )}
-                  Cek Status
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
+        <PendingUpgradeBanner
+          pendingUpgrade={pendingUpgrade}
+          pendingUpgradePlan={pendingUpgradePlan}
+          pendingUpgradeInvoice={pendingUpgradeInvoice}
+          checkingInvoiceId={checkingInvoiceId}
+          onCheckPayment={handleCheckPayment}
+        />
       )}
 
       {/* Plan Features Summary */}
@@ -548,26 +469,10 @@ export default function SubscriptionPage() {
                           </span>
                         )}
 
-                        {/* Check payment button for PENDING invoices */}
+                        {/* Actions for PENDING invoices */}
                         {inv.status === "PENDING" && (
                           <div className="flex items-center gap-1.5">
-                            {inv.paymentUrl && (
-                              <a
-                                href={inv.paymentUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                              >
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-6 text-[10px] gap-1 px-2"
-                                >
-                                  <ExternalLink className="size-2.5" />
-                                  Bayar
-                                </Button>
-                              </a>
-                            )}
-                            {inv.qrString && !inv.paymentUrl && (
+                            {inv.qrString && (
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -855,6 +760,107 @@ export default function SubscriptionPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+// ── Pending Upgrade Banner (extracted for useCountdown) ───────────────────
+
+function PendingUpgradeBanner({
+  pendingUpgrade,
+  pendingUpgradePlan,
+  pendingUpgradeInvoice,
+  checkingInvoiceId,
+  onCheckPayment,
+}: {
+  pendingUpgrade: Subscription;
+  pendingUpgradePlan: SubscriptionPlan | null;
+  pendingUpgradeInvoice: SubscriptionInvoice | null;
+  checkingInvoiceId: string | null;
+  onCheckPayment: (invoiceId: string) => void;
+}) {
+  const { display: countdown, isExpired } = useCountdown(
+    pendingUpgradeInvoice?.paymentExpiresAt ?? null,
+  );
+
+  return (
+    <div className="border border-yellow-200 rounded-xl bg-yellow-50 overflow-hidden">
+      <div className="px-6 py-4 space-y-3">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <Clock className="size-4 text-yellow-600 shrink-0" />
+            <div className="space-y-0.5">
+              <p className="text-sm font-medium text-yellow-800">
+                Upgrade ke{" "}
+                {pendingUpgradePlan?.name ?? pendingUpgrade.planId} menunggu
+                pembayaran
+              </p>
+              <p className="text-xs text-yellow-600">
+                {BILLING_PERIOD_LABEL[pendingUpgrade.billingPeriod]} ·{" "}
+                {formatRupiah(pendingUpgrade.pricePaid)}/periode — Plan aktif
+                saat ini tetap berjalan.
+              </p>
+            </div>
+          </div>
+          <Badge className="text-[10px] shrink-0 bg-yellow-100 text-yellow-700">
+            Menunggu Pembayaran
+          </Badge>
+        </div>
+
+        {/* QRIS QR Code for pending upgrade */}
+        {pendingUpgradeInvoice?.qrString && !isExpired && (
+          <div className="flex items-start gap-4 pt-1">
+            <div className="rounded-lg border border-yellow-300 bg-white p-2">
+              <QRCodeSVG
+                value={pendingUpgradeInvoice.qrString}
+                size={120}
+                level="M"
+              />
+            </div>
+            <div className="text-xs text-yellow-700 space-y-1">
+              <p>
+                Scan QR code untuk membayar via e-wallet atau mobile banking.
+              </p>
+              {pendingUpgradeInvoice.paymentExpiresAt && (
+                <div className="flex items-center gap-1.5 text-yellow-600">
+                  <Timer className="size-3" />
+                  <span className="font-mono font-medium tabular-nums">
+                    {countdown}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* QR expired */}
+        {isExpired && (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 flex items-center gap-2">
+            <AlertCircle className="size-3.5 shrink-0" />
+            QR code sudah kadaluarsa. Refresh halaman atau buat subscription
+            baru.
+          </div>
+        )}
+
+        {pendingUpgradeInvoice && !isExpired && (
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs gap-1.5 border-yellow-300 text-yellow-800 hover:bg-yellow-100"
+              onClick={() => onCheckPayment(pendingUpgradeInvoice.id)}
+              disabled={checkingInvoiceId === pendingUpgradeInvoice.id}
+            >
+              {checkingInvoiceId === pendingUpgradeInvoice.id ? (
+                <Loader2 className="size-3 animate-spin" />
+              ) : (
+                <RefreshCw className="size-3" />
+              )}
+              Cek Status
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
