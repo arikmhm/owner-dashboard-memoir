@@ -40,6 +40,7 @@ export class ApiError extends Error {
 // ── Token management ─────────────────────────────────────────────────────────
 
 const TOKEN_KEY = "memoir_token";
+const USER_KEY = "memoir_user";
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -54,6 +55,25 @@ export function setToken(token: string): void {
 export function removeToken(): void {
   if (typeof window === "undefined") return;
   localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+}
+
+// ── User persistence (supplements JWT which only contains { id, role }) ───────
+
+export function getStoredUser(): { id: string; email: string; role: string } | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(USER_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredUser(user: { id: string; email: string; role: string }): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
 }
 
 // ── Token refresh ────────────────────────────────────────────────────────────

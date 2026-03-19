@@ -16,7 +16,7 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { getToken, setToken, removeToken, ApiError } from "@/lib/api";
+import { getToken, setToken, removeToken, getStoredUser, ApiError } from "@/lib/api";
 import {
   login as apiLogin,
   logout as apiLogout,
@@ -53,18 +53,31 @@ type AuthContextType = AuthState & AuthActions;
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-// ── Helper: decode JWT payload (without verification — just for reading) ─────
+// ── Helper: restore user from localStorage or JWT fallback ───────────────────
 
-function decodeTokenPayload(token: string): AuthUser | null {
+function restoreUser(): AuthUser | null {
+  // Prefer stored user data (set during login) — has email.
+  // JWT only contains { id, role }, so email would be lost on decode.
+  const stored = getStoredUser();
+  if (stored && stored.id && stored.role) {
+    return {
+      id: stored.id,
+      email: stored.email,
+      role: stored.role as AuthUser["role"],
+    };
+  }
+
+  // Fallback: decode JWT for minimal info (id + role only)
+  const token = getToken();
+  if (!token) return null;
   try {
     const base64Url = token.split(".")[1];
     const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
     const payload = JSON.parse(atob(base64));
     return {
       id: payload.id ?? payload.sub,
-      email: payload.email ?? "",
+      email: "",
       role: payload.role,
-      name: payload.name ?? undefined,
     };
   } catch {
     return null;
@@ -128,9 +141,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // Decode user from token
-      const decoded = decodeTokenPayload(token);
-      if (!decoded) {
+      // Restore user from localStorage (has email) or JWT fallback (id+role only)
+      const restored = restoreUser();
+      if (!restored) {
         removeToken();
         setIsLoading(false);
         if (!isPublicRoute(pathname)) {
@@ -139,7 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      setUser(decoded);
+      setUser(restored);
 
       // Fetch subscription status
       try {

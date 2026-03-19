@@ -3,7 +3,7 @@
 // Authentication-related API calls (login, logout, subscription, plans)
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { api, setToken, removeToken, getToken, ApiError } from "./api";
+import { api, setToken, setStoredUser, removeToken, getToken, ApiError } from "./api";
 import type {
   LoginRequest,
   LoginResponse,
@@ -25,6 +25,7 @@ export async function login(
 ): Promise<{ accessToken: string; user: AuthUser }> {
   const res = await api.post<LoginResponse>("/auth/login", credentials);
   setToken(res.data.accessToken);
+  setStoredUser(res.data.user);
   return res.data;
 }
 
