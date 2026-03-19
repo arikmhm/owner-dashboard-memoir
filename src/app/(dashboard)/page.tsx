@@ -243,7 +243,7 @@ export default function DashboardPage() {
   const { stats, subscription, isLoading, error, refresh } = useDashboard();
 
   // Display name: derive from user email or fallback
-  const displayName = user?.name || user?.email?.split("@")[0] || "Owner";
+  const displayName = user?.email?.split("@")[0] || "Owner";
 
   // Subscription derived values
   const subStatus =
