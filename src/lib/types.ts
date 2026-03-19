@@ -24,6 +24,21 @@ export type WithdrawalStatus = "PENDING" | "PROCESSED" | "REJECTED";
 export type ElementType = "photo_slot" | "image" | "text" | "shape";
 export type AssetFolder = "backgrounds" | "overlays" | "elements";
 
+// ── Dashboard ────────────────────────────────────────────────────────────────
+
+export interface DashboardSummary {
+  walletBalance: number;
+  revenueThisMonth: number;
+  paidTransactionsToday: number;
+  activeKiosks: number;
+  maxKiosks: number;
+  planName: string | null;
+  subscriptionStatus: SubscriptionStatus;
+  currentPeriodEnd: string | null;
+  gracePeriodDaysRemaining: number;
+  pendingUpgrade: Subscription | null;
+}
+
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
 export interface AuthUser {

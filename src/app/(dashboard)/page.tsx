@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // memoir. — Dashboard Home (FEAT-OD-02.1)
 // Owner operational summary: subscription banner + 4 stat cards
-// Data: parallel SWR fetch from subscription, wallet, kiosks, transactions
+// Data: single GET /owner/dashboard — server-side aggregation
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useAuth } from "@/components/auth-provider";
@@ -239,17 +239,16 @@ function StatCardSkeleton() {
 // ── Main dashboard page ──────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const { user, subscriptionStatus, gracePeriodDaysRemaining } = useAuth();
-  const { stats, subscription, isLoading, error, refresh } = useDashboard();
+  const { user } = useAuth();
+  const { summary, isLoading, error, refresh } = useDashboard();
 
   // Display name: derive from user email or fallback
   const displayName = user?.email?.split("@")[0] || "Owner";
 
-  // Subscription derived values
-  const subStatus =
-    subscription?.subscriptionStatus ?? subscriptionStatus ?? "ACTIVE";
-  const planName = stats?.planName ?? "—";
-  const periodEnd = subscription?.subscription?.currentPeriodEnd ?? "";
+  // Subscription derived values — all from server-aggregated summary
+  const subStatus = summary?.subscriptionStatus ?? "EXPIRED";
+  const planName = summary?.planName ?? "—";
+  const periodEnd = summary?.currentPeriodEnd ?? "";
   const daysLeft = periodEnd
     ? Math.max(
         0,
@@ -258,8 +257,7 @@ export default function DashboardPage() {
         ),
       )
     : 0;
-  const graceDays =
-    subscription?.gracePeriodDaysRemaining ?? gracePeriodDaysRemaining;
+  const graceDays = summary?.gracePeriodDaysRemaining ?? 0;
 
   // Current month/day labels for stat cards
   const currentMonth = new Date().toLocaleDateString("id-ID", {
@@ -273,31 +271,31 @@ export default function DashboardPage() {
   });
 
   // Stat card definitions (only rendered when data ready)
-  const statCards: StatCardProps[] = stats
+  const statCards: StatCardProps[] = summary
     ? [
         {
           label: "Saldo Wallet",
-          value: formatRupiah(stats.walletBalance),
+          value: formatRupiah(summary.walletBalance),
           icon: Wallet,
           sub: "Tersedia untuk ditarik",
         },
         {
           label: "Pendapatan Bulan Ini",
-          value: formatRupiah(stats.totalRevenueThisMonth),
+          value: formatRupiah(summary.revenueThisMonth),
           icon: TrendingUp,
           sub: currentMonth,
         },
         {
           label: "Transaksi Hari Ini",
-          value: String(stats.totalTransactionsToday),
+          value: String(summary.paidTransactionsToday),
           icon: ReceiptText,
           sub: currentDate,
         },
         {
           label: "Kiosk Aktif",
-          value: `${stats.activeKiosks} / ${stats.maxKiosks}`,
+          value: `${summary.activeKiosks} / ${summary.maxKiosks}`,
           icon: MonitorSmartphone,
-          sub: `Maks. ${stats.maxKiosks} dari plan ${planName}`,
+          sub: `Maks. ${summary.maxKiosks} dari plan ${planName}`,
         },
       ]
     : [];
