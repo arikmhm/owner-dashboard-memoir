@@ -28,6 +28,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/components/auth-provider";
+import { usePlans } from "@/hooks/use-subscription";
 
 function SidebarToggle() {
   const { open, toggleSidebar } = useSidebar();
@@ -58,11 +59,13 @@ const NAV_ITEMS = [
 export function AppSidebar() {
   const pathname = usePathname();
   const { user, subscription, logout } = useAuth();
+  const { plans } = usePlans();
 
   // Derive display info from auth context
   const displayName = user?.email?.split("@")[0] ?? "owner";
   const initials = displayName.slice(0, 2).toUpperCase();
-  const planName = subscription?.plan?.name ?? "—";
+  const planName =
+    plans.find((p) => p.id === subscription?.planId)?.name ?? "—";
 
   return (
     <Sidebar collapsible="icon">

@@ -66,13 +66,12 @@ export interface Subscription {
   billingPeriod: BillingPeriod;
   status: SubscriptionStatus;
   pricePaid: number;
-  currentPeriodStart: string | null;
-  currentPeriodEnd: string | null;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
   previousPlanId: string | null;
   cancelledAt: string | null;
   createdAt: string;
   updatedAt: string;
-  plan?: SubscriptionPlan;
 }
 
 export interface SubscriptionResponse {
@@ -95,7 +94,7 @@ export interface SubscriptionInvoice {
   amount: number;
   billingPeriod: BillingPeriod;
   status: "PENDING" | "PAID" | "FAILED";
-  paymentMethod: string;
+  paymentMethod: PaymentMethod | null;
   qrString: string | null;
   orderId: string;
   periodStart: string;
