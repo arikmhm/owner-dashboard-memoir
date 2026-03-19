@@ -114,8 +114,8 @@ export interface CreateSubscriptionResponse {
 
 export interface CheckPaymentResponse {
   data: {
-    status: string;
-    subscription?: Subscription;
+    status: "PAID" | "PENDING" | "FAILED";
+    subscription: Subscription | null;
   };
 }
 
