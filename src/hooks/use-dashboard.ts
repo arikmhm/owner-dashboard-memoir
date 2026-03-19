@@ -49,39 +49,29 @@ type TxPaginatedResponse = { data: Transaction[]; meta: PaginationMeta };
 
 /**
  * Build query params for today's transactions filter.
- * Uses local timezone start/end of day in ISO format.
+ * Uses [startOfDay, startOfNextDay) range because BE endDate filter uses
+ * strictly-less-than (<), not less-than-or-equal.
  */
 function getTodayParams(): string {
   const now = new Date();
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const endOfDay = new Date(
+  const startOfNextDay = new Date(
     now.getFullYear(),
     now.getMonth(),
-    now.getDate(),
-    23,
-    59,
-    59,
-    999,
+    now.getDate() + 1,
   );
-  return `?status=PAID&startDate=${startOfDay.toISOString()}&endDate=${endOfDay.toISOString()}&limit=1`;
+  return `?status=PAID&startDate=${startOfDay.toISOString()}&endDate=${startOfNextDay.toISOString()}&limit=1`;
 }
 
 /**
  * Build query params for this month's transactions (for revenue calculation).
+ * Uses [startOfMonth, startOfNextMonth) range for the same reason.
  */
 function getMonthParams(): string {
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const endOfMonth = new Date(
-    now.getFullYear(),
-    now.getMonth() + 1,
-    0,
-    23,
-    59,
-    59,
-    999,
-  );
-  return `?status=PAID&startDate=${startOfMonth.toISOString()}&endDate=${endOfMonth.toISOString()}&limit=100`;
+  const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  return `?status=PAID&startDate=${startOfMonth.toISOString()}&endDate=${startOfNextMonth.toISOString()}&limit=100`;
 }
 
 /**
