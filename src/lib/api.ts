@@ -171,7 +171,11 @@ async function apiFetch<T>(
       };
     }
 
-    throw new ApiError(res.status, errorData.error, errorData.message);
+    throw new ApiError(
+      res.status,
+      errorData.error ?? "UNAUTHORIZED",
+      errorData.message ?? "Sesi berakhir, silakan login kembali",
+    );
   }
 
   if (!res.ok) {
@@ -185,7 +189,13 @@ async function apiFetch<T>(
       };
     }
 
-    throw new ApiError(res.status, errorData.error, errorData.message);
+    // BE may omit `message` for ZodError (sends `details` instead) or 500 errors.
+    // Ensure we always have a user-facing message.
+    throw new ApiError(
+      res.status,
+      errorData.error ?? "UNKNOWN_ERROR",
+      errorData.message ?? "Terjadi kesalahan, coba lagi nanti",
+    );
   }
 
   // Handle 204 No Content
