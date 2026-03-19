@@ -6,11 +6,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/components/auth-provider";
 import { formatRupiah } from "@/lib/format";
 import { QRCodeSVG } from "qrcode.react";
-import {
-  createSubscription,
-  checkPaymentStatus,
-  getPlans,
-} from "@/lib/auth-api";
+import { createSubscription, getPlans } from "@/lib/auth-api";
+import { checkPaymentStatus } from "@/hooks/use-subscription";
 import { ApiError } from "@/lib/api";
 import { useCountdown } from "@/hooks/use-countdown";
 import type { SubscriptionPlan, BillingPeriod } from "@/lib/types";

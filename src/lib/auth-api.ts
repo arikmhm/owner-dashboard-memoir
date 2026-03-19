@@ -12,7 +12,6 @@ import type {
   SubscriptionResponse,
   CreateSubscriptionRequest,
   CreateSubscriptionResponse,
-  CheckPaymentResponse,
 } from "./types";
 
 /**
@@ -93,20 +92,6 @@ export async function createSubscription(
   const res = await api.post<CreateSubscriptionResponse>(
     "/owner/subscription",
     data,
-  );
-  return res.data;
-}
-
-/**
- * Check payment status for a subscription invoice.
- * @param invoiceId - UUID of the invoice (not orderId)
- */
-export async function checkPaymentStatus(
-  invoiceId: string,
-): Promise<CheckPaymentResponse["data"]> {
-  const res = await api.post<CheckPaymentResponse>(
-    `/owner/subscription/invoices/${invoiceId}/check-payment`,
-    {},
   );
   return res.data;
 }

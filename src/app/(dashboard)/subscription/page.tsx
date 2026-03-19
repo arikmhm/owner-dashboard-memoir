@@ -45,7 +45,7 @@ import {
   usePlans,
   useInvoices,
   submitSubscription,
-  checkInvoicePayment,
+  checkPaymentStatus,
 } from "@/hooks/use-subscription";
 import { ApiError } from "@/lib/api";
 import { useCountdown } from "@/hooks/use-countdown";
@@ -176,7 +176,7 @@ export default function SubscriptionPage() {
       setCheckingInvoiceId(invoiceId);
 
       try {
-        const result = await checkInvoicePayment(invoiceId);
+        const result = await checkPaymentStatus(invoiceId);
 
         if (result.status === "PAID") {
           toast.success("Pembayaran berhasil! Subscription aktif.");

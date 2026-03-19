@@ -117,7 +117,7 @@ export async function submitSubscription(
 /**
  * Check payment status for a subscription invoice.
  */
-export async function checkInvoicePayment(
+export async function checkPaymentStatus(
   invoiceId: string,
 ): Promise<CheckPaymentResponse["data"]> {
   const res = await api.post<CheckPaymentResponse>(
