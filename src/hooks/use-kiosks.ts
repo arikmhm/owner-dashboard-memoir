@@ -23,7 +23,7 @@ export interface CreateKioskResponse {
   kiosk: {
     id: string;
     name: string;
-    pairingCode: string;
+    pairingCode: string | null;
   };
 }
 

@@ -106,7 +106,7 @@ export function CreateKioskDialog({
   );
 
   const handleCopyCode = useCallback(async () => {
-    if (!pairingResult) return;
+    if (!pairingResult?.kiosk.pairingCode) return;
     try {
       await navigator.clipboard.writeText(pairingResult.kiosk.pairingCode);
       setCopied(true);
@@ -134,24 +134,31 @@ export function CreateKioskDialog({
 
           <div className="flex flex-col items-center gap-4 py-6">
             {/* 6-digit pairing code — prominent display */}
-            <div className="flex items-center gap-3">
-              <span className="font-mono text-4xl font-bold tracking-[0.3em] text-zinc-900 select-all">
-                {pairingResult.kiosk.pairingCode}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-10 w-10 p-0 shrink-0"
-                onClick={handleCopyCode}
-                aria-label="Salin pairing code"
-              >
-                {copied ? (
-                  <Check className="h-4 w-4 text-emerald-600" />
-                ) : (
-                  <Copy className="h-4 w-4" />
-                )}
-              </Button>
-            </div>
+            {pairingResult.kiosk.pairingCode ? (
+              <div className="flex items-center gap-3">
+                <span className="font-mono text-4xl font-bold tracking-[0.3em] text-zinc-900 select-all">
+                  {pairingResult.kiosk.pairingCode}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-10 w-10 p-0 shrink-0"
+                  onClick={handleCopyCode}
+                  aria-label="Salin pairing code"
+                >
+                  {copied ? (
+                    <Check className="h-4 w-4 text-emerald-600" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            ) : (
+              <p className="text-sm text-zinc-500">
+                Pairing code tidak tersedia. Gunakan &ldquo;Generate Pairing
+                Code&rdquo; dari halaman kiosk.
+              </p>
+            )}
 
             <p className="text-xs text-zinc-500 text-center max-w-xs">
               Kiosk:{" "}
