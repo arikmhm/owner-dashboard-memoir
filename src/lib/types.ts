@@ -151,6 +151,8 @@ export interface Transaction {
   orderId: string;
   status: TxStatus;
   paymentMethod: PaymentMethod;
+  qrString: string | null;
+  paymentExpiresAt: string | null;
   printQty: number;
   hasDigitalCopy: boolean;
   appliedBasePrice: number;
