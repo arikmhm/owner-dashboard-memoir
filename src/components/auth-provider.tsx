@@ -135,9 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (!token) {
         setIsLoading(false);
-        if (!isPublicRoute(pathname)) {
-          router.replace("/login");
-        }
+        // Route protection effect handles redirect to /login
         return;
       }
 
@@ -146,9 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!restored) {
         removeToken();
         setIsLoading(false);
-        if (!isPublicRoute(pathname)) {
-          router.replace("/login");
-        }
+        // Route protection effect handles redirect to /login
         return;
       }
 
@@ -185,7 +181,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     init();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Force-logout on token removal (e.g. 401 + refresh failure) ──────────
@@ -210,9 +205,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (isLoading) return;
 
-    // 1. Not authenticated + not on public route → redirect to login
+    // 1. Not authenticated + not on public route → redirect to login.
+    //    Uses hard redirect (not router.replace) because SPA navigation
+    //    can stall. The spinner guard in the render prevents white screen.
     if (!isAuthenticated && !isPublicRoute(pathname)) {
-      router.replace("/login");
+      if (typeof window !== "undefined") {
+        window.location.replace("/login");
+      }
       return;
     }
 
