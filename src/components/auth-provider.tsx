@@ -16,7 +16,7 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { getToken, setToken, removeToken, getStoredUser, ApiError } from "@/lib/api";
+import { getToken, setToken, removeToken, getStoredUser, ApiError, TOKEN_REMOVED_EVENT } from "@/lib/api";
 import {
   login as apiLogin,
   logout as apiLogout,
@@ -186,6 +186,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Force-logout on token removal (e.g. 401 + refresh failure) ──────────
+
+  useEffect(() => {
+    const handleTokenRemoved = () => {
+      setUser(null);
+      setSubscription(null);
+      setSubscriptionStatus(null);
+      setGracePeriodDaysRemaining(0);
+      setPendingUpgrade(null);
+      // isAuthenticated becomes false → route protection effect redirects to /login
+    };
+
+    window.addEventListener(TOKEN_REMOVED_EVENT, handleTokenRemoved);
+    return () =>
+      window.removeEventListener(TOKEN_REMOVED_EVENT, handleTokenRemoved);
   }, []);
 
   // ── Route protection ─────────────────────────────────────────────────────

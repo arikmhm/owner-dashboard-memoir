@@ -52,10 +52,15 @@ export function setToken(token: string): void {
   localStorage.setItem(TOKEN_KEY, token);
 }
 
+/** Event name dispatched when token is forcibly removed (e.g. 401 + refresh fail). */
+export const TOKEN_REMOVED_EVENT = "memoir:token-removed";
+
 export function removeToken(): void {
   if (typeof window === "undefined") return;
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
+  // Notify AuthProvider so it can clear React state and SPA-redirect to /login
+  window.dispatchEvent(new Event(TOKEN_REMOVED_EVENT));
 }
 
 // ── User persistence (supplements JWT which only contains { id, role }) ───────
@@ -153,11 +158,10 @@ async function apiFetch<T>(
     }
 
     if (!isAuthEndpoint) {
-      // Refresh failed or already a retry → clear and redirect
+      // Refresh failed or already a retry → clear token.
+      // AuthProvider listens for TOKEN_REMOVED_EVENT and handles
+      // the SPA redirect to /login (no white-screen full reload).
       removeToken();
-      if (typeof window !== "undefined") {
-        window.location.href = "/login";
-      }
     }
 
     // Parse actual backend error response instead of hardcoding
@@ -285,7 +289,6 @@ export const api = {
         return retryRes.json();
       }
       removeToken();
-      if (typeof window !== "undefined") window.location.href = "/login";
       throw new ApiError(401, "UNAUTHORIZED", "Sesi berakhir");
     }
 
