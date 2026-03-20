@@ -300,13 +300,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const handleLogout = useCallback(() => {
+    // 1. Clear token from localStorage FIRST (prevents redirect loop)
+    removeToken();
+    // 2. Clear React state
     setUser(null);
     setSubscription(null);
     setSubscriptionStatus(null);
     setGracePeriodDaysRemaining(0);
     setPendingUpgrade(null);
-    // apiLogout is async but we don't need to wait — it handles redirect
+    // 3. Server-side logout (fire and forget — may not complete before redirect)
     apiLogout();
+    // Route protection effect handles redirect to /login
   }, []);
 
   const refreshSubscription = useCallback(async () => {

@@ -3,7 +3,7 @@
 // Authentication-related API calls (login, logout, subscription status)
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { api, setToken, setStoredUser, removeToken, getToken, ApiError } from "./api";
+import { api, setToken, setStoredUser, getToken, ApiError } from "./api";
 import type {
   LoginRequest,
   LoginResponse,
@@ -26,19 +26,14 @@ export async function login(
 }
 
 /**
- * Logout: revoke refresh token via API, then clear local token.
- * POST /auth/logout clears the refresh_token cookie server-side.
+ * Server-side logout: revoke refresh token via API.
+ * Fire-and-forget — caller (AuthProvider) handles token removal and redirect.
  */
 export async function logout(): Promise<void> {
   try {
     await api.post("/auth/logout");
   } catch {
-    // Ignore errors — we're logging out regardless
-  } finally {
-    removeToken();
-    if (typeof window !== "undefined") {
-      window.location.href = "/login";
-    }
+    // Ignore errors — logging out regardless
   }
 }
 
