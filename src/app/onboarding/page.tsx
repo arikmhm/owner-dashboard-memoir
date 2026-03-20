@@ -6,8 +6,11 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/components/auth-provider";
 import { formatRupiah } from "@/lib/format";
 import { QRCodeSVG } from "qrcode.react";
-import { createSubscription, getPlans } from "@/lib/auth-api";
-import { checkPaymentStatus } from "@/hooks/use-subscription";
+import {
+  fetchPlans,
+  submitSubscription,
+  checkPaymentStatus,
+} from "@/hooks/use-subscription";
 import { ApiError } from "@/lib/api";
 import { useCountdown } from "@/hooks/use-countdown";
 import type { SubscriptionPlan, BillingPeriod } from "@/lib/types";
@@ -61,7 +64,7 @@ function OnboardingContent() {
     error: plansError,
   } = useQuery<SubscriptionPlan[]>({
     queryKey: ["subscription-plans"],
-    queryFn: getPlans,
+    queryFn: fetchPlans,
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
     retry: 2,
@@ -70,7 +73,7 @@ function OnboardingContent() {
   // ── Create subscription mutation ─────────────────────────────────────────
 
   const subscriptionMutation = useMutation({
-    mutationFn: createSubscription,
+    mutationFn: submitSubscription,
     onSuccess: (result) => {
       const { invoice } = result;
 

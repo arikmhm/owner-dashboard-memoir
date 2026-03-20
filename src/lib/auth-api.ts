@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // memoir. — Auth API
-// Authentication-related API calls (login, logout, subscription, plans)
+// Authentication-related API calls (login, logout, subscription status)
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { api, setToken, setStoredUser, removeToken, getToken, ApiError } from "./api";
@@ -8,10 +8,7 @@ import type {
   LoginRequest,
   LoginResponse,
   AuthUser,
-  SubscriptionPlan,
   SubscriptionResponse,
-  CreateSubscriptionRequest,
-  CreateSubscriptionResponse,
 } from "./types";
 
 /**
@@ -71,27 +68,3 @@ export async function getSubscription(): Promise<SubscriptionResponse | null> {
   }
 }
 
-/**
- * Get all available (active) subscription plans.
- * Uses GET /owner/subscription/plans — owner-facing endpoint.
- */
-export async function getPlans(): Promise<SubscriptionPlan[]> {
-  const res = await api.get<{ data: SubscriptionPlan[] }>(
-    "/owner/subscription/plans",
-  );
-  return res.data;
-}
-
-/**
- * Create a new subscription (select plan).
- * Returns payment URL for redirect.
- */
-export async function createSubscription(
-  data: CreateSubscriptionRequest,
-): Promise<CreateSubscriptionResponse["data"]> {
-  const res = await api.post<CreateSubscriptionResponse>(
-    "/owner/subscription",
-    data,
-  );
-  return res.data;
-}

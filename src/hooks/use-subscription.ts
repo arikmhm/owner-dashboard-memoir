@@ -27,7 +27,18 @@ interface InvoicePageData {
   meta: PaginationMeta;
 }
 
-// ── Plans Hook ───────────────────────────────────────────────────────────────
+// ── Plans ────────────────────────────────────────────────────────────────────
+
+/**
+ * Fetch all available (active) subscription plans.
+ * Exported for direct use as a queryFn (e.g. onboarding page).
+ */
+export async function fetchPlans(): Promise<SubscriptionPlan[]> {
+  const res = await api.get<ApiSuccessResponse<SubscriptionPlan[]>>(
+    "/owner/subscription/plans",
+  );
+  return res.data;
+}
 
 export interface UsePlansReturn {
   /** Available subscription plans */
@@ -41,12 +52,7 @@ export interface UsePlansReturn {
 export function usePlans(): UsePlansReturn {
   const { data, error, isLoading } = useQuery<SubscriptionPlan[]>({
     queryKey: ["subscription-plans"],
-    queryFn: async () => {
-      const res = await api.get<ApiSuccessResponse<SubscriptionPlan[]>>(
-        "/owner/subscription/plans",
-      );
-      return res.data;
-    },
+    queryFn: fetchPlans,
     staleTime: 5 * 60_000, // plans rarely change
   });
 

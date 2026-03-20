@@ -142,7 +142,7 @@ export interface Kiosk {
   name: string;
   /** Excluded from list response for security */
   pairingCode?: string | null;
-  /** Not returned by list endpoint */
+  /** null if kiosk has not been paired or was re-paired */
   pairedAt?: string | null;
   isActive: boolean;
   priceBaseSession: number;
@@ -284,6 +284,8 @@ export interface CreateTemplateRequest {
 
 export interface UpdateTemplateRequest {
   name?: string;
+  width?: number;
+  height?: number;
   backgroundUrl?: string;
   overlayUrl?: string | null;
   overridePriceBase?: number | null;

@@ -74,7 +74,6 @@ export function useTemplates(): UseTemplatesReturn {
     return template;
   });
 
-  // Toggle active uses PATCH — flat response (no wrapper key)
   const updateMutation = useMutation({
     mutationFn: async ({
       id,
@@ -83,11 +82,10 @@ export function useTemplates(): UseTemplatesReturn {
       id: string;
       data: UpdateTemplateRequest;
     }): Promise<Template> => {
-      const res = await api.patch<ApiSuccessResponse<Template>>(
-        `/owner/templates/${id}`,
-        data,
-      );
-      return res.data;
+      const res = await api.patch<
+        ApiSuccessResponse<{ template: Template }>
+      >(`/owner/templates/${id}`, data);
+      return res.data.template;
     },
     onMutate: async ({ id, data }) => {
       await queryClient.cancelQueries({ queryKey: TEMPLATES_KEY });
@@ -181,66 +179,23 @@ export interface UseTemplateDetailReturn {
 }
 
 /**
- * Extract template fields from a detail response.
- * Defensive: handles both flat `{ id, name, ... }` and nested
- * `{ template: { id, name, ... } }` response shapes — matching the same
- * defensive pattern already used in createTemplateWithElements /
- * updateTemplateWithElements.
+ * Split a detail response into template metadata and sorted elements.
  */
-function extractDetailData(raw: unknown): {
+function extractDetailData(raw: TemplateDetailResponse | undefined): {
   template: Template | null;
   elements: TemplateElement[];
 } {
-  if (!raw || typeof raw !== "object") return { template: null, elements: [] };
-
-  const obj = raw as Record<string, unknown>;
-
-  // Detect flat vs nested: if `obj.id` exists the template fields are at root
-  const tplData: Record<string, unknown> | undefined =
-    typeof obj.id === "string"
-      ? obj
-      : typeof (obj as { template?: unknown }).template === "object" &&
-          (obj as { template?: unknown }).template !== null
-        ? ((obj as { template: Record<string, unknown> }).template as Record<
-            string,
-            unknown
-          >)
-        : undefined;
-
-  if (!tplData?.id) return { template: null, elements: [] };
-
-  const template: Template = {
-    id: tplData.id as string,
-    ownerId: (tplData.ownerId as string) ?? "",
-    name: (tplData.name as string) ?? "",
-    width: (tplData.width as number) ?? 576,
-    height: (tplData.height as number) ?? 864,
-    backgroundUrl: (tplData.backgroundUrl as string) ?? "",
-    overlayUrl: (tplData.overlayUrl as string | null) ?? null,
-    overridePriceBase: (tplData.overridePriceBase as number | null) ?? null,
-    overridePriceExtraPrint:
-      (tplData.overridePriceExtraPrint as number | null) ?? null,
-    overridePriceDigitalCopy:
-      (tplData.overridePriceDigitalCopy as number | null) ?? null,
-    isActive: (tplData.isActive as boolean) ?? true,
-    createdAt: (tplData.createdAt as string) ?? "",
-    updatedAt: (tplData.updatedAt as string) ?? "",
+  if (!raw) return { template: null, elements: [] };
+  const { elements: rawElements, ...template } = raw;
+  return {
+    template,
+    elements: [...rawElements].sort((a, b) => a.sequence - b.sequence),
   };
-
-  // Elements can be at root level OR inside the nested template object
-  const rawElements =
-    (obj.elements as TemplateElement[]) ??
-    (tplData.elements as TemplateElement[]) ??
-    [];
-  const elements = [...rawElements].sort((a, b) => a.sequence - b.sequence);
-
-  return { template, elements };
 }
 
 /**
  * Fetch single template detail.
- * GET /owner/templates/:id returns { data: { ...template, elements: [...] } }
- * Defensively handles both flat and nested response shapes.
+ * GET /owner/templates/:id returns { data: { template: { ...fields, elements } } }
  */
 export function useTemplateDetail(id: string | null): UseTemplateDetailReturn {
   const queryClient = useQueryClient();
@@ -248,19 +203,20 @@ export function useTemplateDetail(id: string | null): UseTemplateDetailReturn {
   const { data, error, isLoading } = useQuery<TemplateDetailResponse>({
     queryKey: id ? templateKey(id) : ["noop"],
     queryFn: async () => {
-      const res = await api.get<ApiSuccessResponse<TemplateDetailResponse>>(
-        `/owner/templates/${id}`,
-      );
-      return res.data;
+      const res = await api.get<
+        ApiSuccessResponse<{ template: TemplateDetailResponse }>
+      >(`/owner/templates/${id}`);
+      return res.data.template;
     },
     enabled: !!id,
     staleTime: 60_000,
     // Seed from cached list data for instant rendering when navigating from list
     placeholderData: () => {
       const listData =
-        queryClient.getQueryData<TemplateDetailResponse[]>(TEMPLATES_KEY);
-      // The list includes templates with embedded elements — find the matching one
-      return listData?.find((t) => (t as unknown as { id?: string }).id === id);
+        queryClient.getQueryData<TemplateListItem[]>(TEMPLATES_KEY);
+      const match = listData?.find((t) => t.id === id);
+      if (!match?.elements) return undefined;
+      return match as TemplateDetailResponse;
     },
   });
 
@@ -306,39 +262,30 @@ export interface TemplateSaveData {
 
 /**
  * Create a new template with all its elements.
- * POST /owner/templates returns flat { data: Template } (no wrapper key).
- * Follows async-parallel: creates template first, then batch-creates elements.
+ * POST /owner/templates returns { data: { template: Template } }.
+ * Creates template first, then batch-creates elements sequentially.
  */
 export async function createTemplateWithElements(
   data: TemplateSaveData,
 ): Promise<Template> {
-  // 1. Create the template — API returns { data: { ...template fields } }
-  const res = await api.post<ApiSuccessResponse<Template>>("/owner/templates", {
-    name: data.name,
-    width: data.width,
-    height: data.height,
-    backgroundUrl: data.backgroundUrl,
-    overlayUrl: data.overlayUrl ?? null,
-    overridePriceBase: data.overridePriceBase ?? null,
-    overridePriceExtraPrint: data.overridePriceExtraPrint ?? null,
-    overridePriceDigitalCopy: data.overridePriceDigitalCopy ?? null,
-    isActive: data.isActive,
-  });
+  // 1. Create the template
+  const res = await api.post<ApiSuccessResponse<{ template: Template }>>(
+    "/owner/templates",
+    {
+      name: data.name,
+      width: data.width,
+      height: data.height,
+      backgroundUrl: data.backgroundUrl,
+      overlayUrl: data.overlayUrl ?? null,
+      overridePriceBase: data.overridePriceBase ?? null,
+      overridePriceExtraPrint: data.overridePriceExtraPrint ?? null,
+      overridePriceDigitalCopy: data.overridePriceDigitalCopy ?? null,
+      isActive: data.isActive,
+    },
+  );
 
-  // Defensive: handle both flat { data: { id, ... } } and potentially
-  // wrapped { data: { template: { id, ... } } } response shapes
-  const raw = res.data as unknown as Record<string, unknown>;
-  const created: Template =
-    typeof raw.id === "string"
-      ? (raw as unknown as Template)
-      : (raw as unknown as { template: Template }).template;
-
-  const templateId = created?.id;
-  if (!templateId) {
-    throw new Error(
-      "Template berhasil dibuat tapi ID tidak ditemukan dalam response.",
-    );
-  }
+  const created = res.data.template;
+  const templateId = created.id;
 
   // 2. Create elements sequentially (avoids potential 409 CONFLICT race
   //    conditions on unique sequence constraint).
@@ -378,7 +325,7 @@ export async function createTemplateWithElements(
 
 /**
  * Update an existing template and sync its elements.
- * PATCH /owner/templates/:id returns flat { data: Template } (no wrapper key).
+ * PATCH /owner/templates/:id returns { data: { template: Template } }.
  * Handles element creation, updating, and deletion.
  */
 export async function updateTemplateWithElements(
@@ -386,19 +333,20 @@ export async function updateTemplateWithElements(
   data: TemplateSaveData,
   existingElements: TemplateElement[],
 ): Promise<Template> {
-  // 1. Update template metadata — API returns { data: { ...template fields } }
-  const templatePromise = api.patch<ApiSuccessResponse<Template>>(
-    `/owner/templates/${templateId}`,
-    {
-      name: data.name,
-      backgroundUrl: data.backgroundUrl,
-      overlayUrl: data.overlayUrl ?? null,
-      overridePriceBase: data.overridePriceBase ?? null,
-      overridePriceExtraPrint: data.overridePriceExtraPrint ?? null,
-      overridePriceDigitalCopy: data.overridePriceDigitalCopy ?? null,
-      isActive: data.isActive,
-    },
-  );
+  // 1. Update template metadata
+  const templatePromise = api.patch<
+    ApiSuccessResponse<{ template: Template }>
+  >(`/owner/templates/${templateId}`, {
+    name: data.name,
+    width: data.width,
+    height: data.height,
+    backgroundUrl: data.backgroundUrl,
+    overlayUrl: data.overlayUrl ?? null,
+    overridePriceBase: data.overridePriceBase ?? null,
+    overridePriceExtraPrint: data.overridePriceExtraPrint ?? null,
+    overridePriceDigitalCopy: data.overridePriceDigitalCopy ?? null,
+    isActive: data.isActive,
+  });
 
   // 2. Determine element changes
   // existingIds holds UUIDs from the database.
@@ -468,15 +416,8 @@ export async function updateTemplateWithElements(
     await api.post(elementsEndpoint, payload);
   }
 
-  const templateResult =
-    (await templatePromise) as ApiSuccessResponse<Template>;
-
-  // Defensive: handle both flat and potentially wrapped response shapes
-  const rawUpdate = templateResult.data as unknown as Record<string, unknown>;
-  return typeof rawUpdate.id === "string"
-    ? (rawUpdate as unknown as Template)
-    : ((rawUpdate as unknown as { template: Template }).template ??
-        (rawUpdate as unknown as Template));
+  const templateResult = await templatePromise;
+  return templateResult.data.template;
 }
 
 export { ApiError };
