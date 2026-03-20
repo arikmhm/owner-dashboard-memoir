@@ -345,6 +345,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshSubscription,
   };
 
+  // Show a loading indicator on protected routes while redirect to /login is
+  // pending. Without this guard, the protected page component renders with no
+  // auth data and produces a blank white screen.
+  if (
+    !isLoading &&
+    !isAuthenticated &&
+    !isPublicRoute(pathname) &&
+    !isAuthOnlyRoute(pathname)
+  ) {
+    return (
+      <AuthContext.Provider value={value}>
+        <div className="min-h-screen flex items-center justify-center bg-zinc-50">
+          <div className="h-5 w-5 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600" />
+        </div>
+      </AuthContext.Provider>
+    );
+  }
+
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
