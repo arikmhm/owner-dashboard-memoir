@@ -50,6 +50,9 @@ export function getToken(): string | null {
 export function setToken(token: string): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(TOKEN_KEY, token);
+  // Signal proxy that user is authenticated
+  const secure = window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `auth_session=1; path=/; max-age=604800; SameSite=Strict${secure}`;
 }
 
 /** Event name dispatched when token is forcibly removed (e.g. 401 + refresh fail). */
@@ -59,7 +62,9 @@ export function removeToken(): void {
   if (typeof window === "undefined") return;
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
-  // Notify AuthProvider so it can clear React state and SPA-redirect to /login
+  // Clear proxy session signal so next navigation redirects to /login
+  document.cookie = "auth_session=; path=/; max-age=0; SameSite=Strict";
+  // Notify AuthProvider so it can clear React state
   window.dispatchEvent(new Event(TOKEN_REMOVED_EVENT));
 }
 

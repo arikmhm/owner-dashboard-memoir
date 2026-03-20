@@ -206,12 +206,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (isLoading) return;
 
     // 1. Not authenticated + not on public route → redirect to login.
-    //    Uses hard redirect (not router.replace) because SPA navigation
-    //    can stall. The spinner guard in the render prevents white screen.
+    //    Proxy handles this server-side for initial page loads;
+    //    this catches client-side state changes (e.g. 401 mid-session).
     if (!isAuthenticated && !isPublicRoute(pathname)) {
-      if (typeof window !== "undefined") {
-        window.location.replace("/login");
-      }
+      router.replace("/login");
       return;
     }
 
@@ -289,18 +287,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setUser(authUser);
 
-      // Navigate to the appropriate page.
-      // Use window.location.href (full reload) instead of router.replace to:
-      // 1. Override any pending hard redirect to /login from apiFetch's 401 handler
-      // 2. Ensure clean state initialization on the destination page
       const destination = hasActiveSubscription(subStatus) ? "/" : "/onboarding";
-      window.location.href = destination;
+      router.replace(destination);
     },
-    [],
+    [router],
   );
 
   const handleLogout = useCallback(() => {
-    // 1. Clear token from localStorage FIRST (prevents redirect loop)
+    // 1. Clear localStorage + auth_session cookie (proxy sees "logged out" immediately)
     removeToken();
     // 2. Clear React state
     setUser(null);
@@ -308,10 +302,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSubscriptionStatus(null);
     setGracePeriodDaysRemaining(0);
     setPendingUpgrade(null);
-    // 3. Server-side logout (fire and forget — may not complete before redirect)
+    // 3. Server-side logout (fire-and-forget — clears HttpOnly cookies via Set-Cookie)
     apiLogout();
-    // Route protection effect handles redirect to /login
-  }, []);
+    // 4. SPA redirect (proxy also redirects if this is a fresh navigation)
+    router.replace("/login");
+  }, [router]);
 
   const refreshSubscription = useCallback(async () => {
     try {
@@ -347,24 +342,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logout: handleLogout,
     refreshSubscription,
   };
-
-  // Show a loading indicator on protected routes while redirect to /login is
-  // pending. Without this guard, the protected page component renders with no
-  // auth data and produces a blank white screen.
-  if (
-    !isLoading &&
-    !isAuthenticated &&
-    !isPublicRoute(pathname) &&
-    !isAuthOnlyRoute(pathname)
-  ) {
-    return (
-      <AuthContext.Provider value={value}>
-        <div className="min-h-screen flex items-center justify-center bg-zinc-50">
-          <div className="h-5 w-5 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600" />
-        </div>
-      </AuthContext.Provider>
-    );
-  }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

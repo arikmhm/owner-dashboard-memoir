@@ -12,7 +12,11 @@ const PUBLIC_ROUTES = ["/login"];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const hasSession = request.cookies.has("refresh_token");
+  // Migration: support both cookies during transition for existing sessions.
+  // Remove `refresh_token` fallback after 1 week (refresh token lifetime).
+  const hasSession =
+    request.cookies.has("auth_session") ||
+    request.cookies.has("refresh_token");
   const isPublic = PUBLIC_ROUTES.some(
     (r) => pathname === r || pathname.startsWith(`${r}/`),
   );
