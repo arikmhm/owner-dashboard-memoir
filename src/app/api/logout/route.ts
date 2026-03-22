@@ -13,14 +13,13 @@ export async function POST(request: NextRequest) {
   const refreshToken = request.cookies.get("refresh_token")?.value;
 
   // Forward to backend to delete token from DB (best-effort)
+  // Send token in body (not Cookie header) to avoid runtime header stripping
   if (refreshToken) {
     try {
       await fetch(`${BACKEND_URL}/auth/logout`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Cookie: `refresh_token=${refreshToken}`,
-        },
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken }),
       });
     } catch {
       // Backend unreachable — still clear the cookie below

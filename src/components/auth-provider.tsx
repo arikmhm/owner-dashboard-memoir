@@ -16,7 +16,6 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query";
 import { getToken, setToken, removeToken, refreshAccessToken, ApiError, TOKEN_REMOVED_EVENT } from "@/lib/api";
 import {
   login as apiLogin,
@@ -102,7 +101,6 @@ function hasActiveSubscription(status: SubscriptionStatus | null): boolean {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const queryClient = useQueryClient();
 
   const [user, setUser] = useState<AuthUser | null>(null);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
@@ -121,19 +119,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     async function init() {
       // After page refresh, in-memory token is empty.
-      // Attempt refresh via HttpOnly refresh_token cookie.
+      // On public routes (e.g. /login after logout), skip refresh entirely —
+      // the proxy already redirected authenticated users away, so reaching
+      // here means there is no valid session. Avoids a wasted 401 call.
       let token = getToken();
       if (!token) {
+        if (isPublicRoute(window.location.pathname)) {
+          setIsLoading(false);
+          return;
+        }
         token = await refreshAccessToken();
         if (!token) {
-          // No valid session. On protected routes: keep isLoading=true
-          // (prevents blank screen) and hard-redirect so the proxy runs
-          // fresh with the now-cleared refresh_token cookie.
-          if (!isPublicRoute(window.location.pathname)) {
-            window.location.href = "/login";
-          } else {
-            setIsLoading(false);
-          }
+          // No valid session. Keep isLoading=true (prevents blank screen)
+          // and hard-redirect so the proxy runs fresh with the now-cleared
+          // refresh_token cookie.
+          window.location.href = "/login";
           return;
         }
       }
@@ -303,19 +303,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // Same-origin call — failure extremely unlikely
     }
-    // 3. Clear in-memory token & notify listeners
+    // 3. Clear in-memory token so no API calls can be made
     removeToken();
-    // 4. Clear React state
-    setUser(null);
-    setSubscription(null);
-    setSubscriptionStatus(null);
-    setGracePeriodDaysRemaining(0);
-    setPendingUpgrade(null);
-    // 5. Clear query cache (prevent stale data on re-login)
-    queryClient.clear();
-    // 6. SPA redirect
-    router.replace("/login");
-  }, [router, queryClient]);
+    // 4. Full page reload to /login — resets all in-memory state, query cache,
+    //    and re-runs init effect which correctly handles the "no session" case.
+    window.location.href = "/login";
+  }, []);
 
   const refreshSubscription = useCallback(async () => {
     try {
