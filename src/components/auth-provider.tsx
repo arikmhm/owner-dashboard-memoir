@@ -16,6 +16,7 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { getToken, setToken, removeToken, refreshAccessToken, ApiError, TOKEN_REMOVED_EVENT } from "@/lib/api";
 import {
   login as apiLogin,
@@ -101,6 +102,7 @@ function hasActiveSubscription(status: SubscriptionStatus | null): boolean {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+  const queryClient = useQueryClient();
 
   const [user, setUser] = useState<AuthUser | null>(null);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
@@ -292,20 +294,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [router],
   );
 
-  const handleLogout = useCallback(() => {
-    // 1. Clear in-memory token & notify listeners
+  const handleLogout = useCallback(async () => {
+    // 1. Show loading spinner (prevents dashboard crash with null state)
+    setIsLoading(true);
+    // 2. Clear cookie + delete token from DB via Next.js route handler
+    try {
+      await apiLogout();
+    } catch {
+      // Same-origin call — failure extremely unlikely
+    }
+    // 3. Clear in-memory token & notify listeners
     removeToken();
-    // 2. Clear React state
+    // 4. Clear React state
     setUser(null);
     setSubscription(null);
     setSubscriptionStatus(null);
     setGracePeriodDaysRemaining(0);
     setPendingUpgrade(null);
-    // 3. Server-side logout (fire-and-forget — deletes RT + clears HttpOnly cookie)
-    apiLogout();
-    // 4. SPA redirect
+    // 5. Clear query cache (prevent stale data on re-login)
+    queryClient.clear();
+    // 6. SPA redirect
     router.replace("/login");
-  }, [router]);
+  }, [router, queryClient]);
 
   const refreshSubscription = useCallback(async () => {
     try {

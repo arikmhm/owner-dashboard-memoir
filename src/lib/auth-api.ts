@@ -25,15 +25,11 @@ export async function login(
 }
 
 /**
- * Server-side logout: delete refresh token via API.
- * Fire-and-forget — caller (AuthProvider) handles token removal and redirect.
+ * Server-side logout via Next.js route handler.
+ * Clears HttpOnly cookie at same origin (guaranteed) and deletes token from DB.
  */
 export async function logout(): Promise<void> {
-  try {
-    await api.post("/auth/logout");
-  } catch {
-    // Ignore errors — logging out regardless
-  }
+  await fetch("/api/logout", { method: "POST" });
 }
 
 /**
