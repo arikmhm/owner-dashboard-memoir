@@ -124,8 +124,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!token) {
         token = await refreshAccessToken();
         if (!token) {
-          setIsLoading(false);
-          // Route protection effect handles redirect to /login
+          // No valid session. On protected routes: keep isLoading=true
+          // (prevents blank screen) and hard-redirect so the proxy runs
+          // fresh with the now-cleared refresh_token cookie.
+          if (!isPublicRoute(window.location.pathname)) {
+            window.location.href = "/login";
+          } else {
+            setIsLoading(false);
+          }
           return;
         }
       }
@@ -134,8 +140,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const restored = decodeTokenUser(token);
       if (!restored) {
         removeToken();
-        setIsLoading(false);
-        // Route protection effect handles redirect to /login
+        if (!isPublicRoute(window.location.pathname)) {
+          window.location.href = "/login";
+        } else {
+          setIsLoading(false);
+        }
         return;
       }
 
