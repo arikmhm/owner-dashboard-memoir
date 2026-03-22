@@ -16,7 +16,7 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { getToken, setToken, removeToken, getStoredUser, ApiError, TOKEN_REMOVED_EVENT } from "@/lib/api";
+import { getToken, setToken, removeToken, refreshAccessToken, ApiError, TOKEN_REMOVED_EVENT } from "@/lib/api";
 import {
   login as apiLogin,
   logout as apiLogout,
@@ -53,30 +53,17 @@ type AuthContextType = AuthState & AuthActions;
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-// ── Helper: restore user from localStorage or JWT fallback ───────────────────
+// ── Helper: decode JWT payload to extract user info ─────────────────────────
 
-function restoreUser(): AuthUser | null {
-  // Prefer stored user data (set during login) — has email.
-  // JWT only contains { id, role }, so email would be lost on decode.
-  const stored = getStoredUser();
-  if (stored && stored.id && stored.role) {
-    return {
-      id: stored.id,
-      email: stored.email,
-      role: stored.role as AuthUser["role"],
-    };
-  }
-
-  // Fallback: decode JWT for minimal info (id + role only)
-  const token = getToken();
-  if (!token) return null;
+function decodeTokenUser(token: string): AuthUser | null {
   try {
     const base64Url = token.split(".")[1];
     const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
     const payload = JSON.parse(atob(base64));
+    if (!payload.id || !payload.role) return null;
     return {
-      id: payload.id ?? payload.sub,
-      email: "",
+      id: payload.id,
+      email: payload.email ?? "",
       role: payload.role,
     };
   } catch {
@@ -131,16 +118,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     async function init() {
-      const token = getToken();
-
+      // After page refresh, in-memory token is empty.
+      // Attempt refresh via HttpOnly refresh_token cookie.
+      let token = getToken();
       if (!token) {
-        setIsLoading(false);
-        // Route protection effect handles redirect to /login
-        return;
+        token = await refreshAccessToken();
+        if (!token) {
+          setIsLoading(false);
+          // Route protection effect handles redirect to /login
+          return;
+        }
       }
 
-      // Restore user from localStorage (has email) or JWT fallback (id+role only)
-      const restored = restoreUser();
+      // Decode JWT for user info (id + role; email is only available during login)
+      const restored = decodeTokenUser(token);
       if (!restored) {
         removeToken();
         setIsLoading(false);
@@ -267,9 +258,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } catch {
         // Non-blocking — treat as no subscription.
-        // If getSubscription hit a 401, apiFetch already called removeToken()
-        // and scheduled window.location.href = "/login". Restore the token so
-        // the redirect (or page reload) lands with valid auth state.
+        // If getSubscription hit a 401, apiFetch already called removeToken().
+        // Restore the token so subsequent navigation works.
         if (!getToken()) {
           setToken(accessToken);
         }
@@ -294,7 +284,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const handleLogout = useCallback(() => {
-    // 1. Clear localStorage + auth_session cookie (proxy sees "logged out" immediately)
+    // 1. Clear in-memory token & notify listeners
     removeToken();
     // 2. Clear React state
     setUser(null);
@@ -302,9 +292,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSubscriptionStatus(null);
     setGracePeriodDaysRemaining(0);
     setPendingUpgrade(null);
-    // 3. Server-side logout (fire-and-forget — clears HttpOnly cookies via Set-Cookie)
+    // 3. Server-side logout (fire-and-forget — deletes RT + clears HttpOnly cookie)
     apiLogout();
-    // 4. SPA redirect (proxy also redirects if this is a fresh navigation)
+    // 4. SPA redirect
     router.replace("/login");
   }, [router]);
 

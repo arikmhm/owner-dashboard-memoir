@@ -3,7 +3,7 @@
 // Authentication-related API calls (login, logout, subscription status)
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { api, setToken, setStoredUser, getToken, ApiError } from "./api";
+import { api, setToken, ApiError } from "./api";
 import type {
   LoginRequest,
   LoginResponse,
@@ -13,7 +13,7 @@ import type {
 
 /**
  * Login with email & password.
- * Stores accessToken in localStorage on success.
+ * Stores accessToken in memory on success.
  * Backend also sends refresh_token via Set-Cookie (HttpOnly).
  */
 export async function login(
@@ -21,12 +21,11 @@ export async function login(
 ): Promise<{ accessToken: string; user: AuthUser }> {
   const res = await api.post<LoginResponse>("/auth/login", credentials);
   setToken(res.data.accessToken);
-  setStoredUser(res.data.user);
   return res.data;
 }
 
 /**
- * Server-side logout: revoke refresh token via API.
+ * Server-side logout: delete refresh token via API.
  * Fire-and-forget — caller (AuthProvider) handles token removal and redirect.
  */
 export async function logout(): Promise<void> {
@@ -35,13 +34,6 @@ export async function logout(): Promise<void> {
   } catch {
     // Ignore errors — logging out regardless
   }
-}
-
-/**
- * Check if user has a valid token stored.
- */
-export function isAuthenticated(): boolean {
-  return !!getToken();
 }
 
 /**

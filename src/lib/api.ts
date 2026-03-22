@@ -37,53 +37,26 @@ export class ApiError extends Error {
   }
 }
 
-// ── Token management ─────────────────────────────────────────────────────────
+// ── Token management (in-memory) ─────────────────────────────────────────────
 
-const TOKEN_KEY = "memoir_token";
-const USER_KEY = "memoir_user";
+let accessToken: string | null = null;
 
 export function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(TOKEN_KEY);
+  return accessToken;
 }
 
 export function setToken(token: string): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(TOKEN_KEY, token);
-  // Signal proxy that user is authenticated
-  const secure = window.location.protocol === "https:" ? "; Secure" : "";
-  document.cookie = `auth_session=1; path=/; max-age=604800; SameSite=Strict${secure}`;
+  accessToken = token;
 }
 
 /** Event name dispatched when token is forcibly removed (e.g. 401 + refresh fail). */
 export const TOKEN_REMOVED_EVENT = "memoir:token-removed";
 
 export function removeToken(): void {
+  accessToken = null;
   if (typeof window === "undefined") return;
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(USER_KEY);
-  // Clear proxy session signal so next navigation redirects to /login
-  document.cookie = "auth_session=; path=/; max-age=0; SameSite=Strict";
   // Notify AuthProvider so it can clear React state
   window.dispatchEvent(new Event(TOKEN_REMOVED_EVENT));
-}
-
-// ── User persistence (supplements JWT which only contains { id, role }) ───────
-
-export function getStoredUser(): { id: string; email: string; role: string } | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(USER_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}
-
-export function setStoredUser(user: { id: string; email: string; role: string }): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
 }
 
 // ── Token refresh ────────────────────────────────────────────────────────────
@@ -94,7 +67,7 @@ let refreshPromise: Promise<string | null> | null = null;
  * Attempt to refresh the access token using the HttpOnly refresh_token cookie.
  * Uses a shared promise to prevent concurrent refresh requests.
  */
-async function refreshAccessToken(): Promise<string | null> {
+export async function refreshAccessToken(): Promise<string | null> {
   try {
     const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
       method: "POST",

@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // memoir. — Server-Side Auth Proxy
 // Redirects unauthenticated users at the server level before page JS loads.
-// Checks `auth_session` cookie (set by client on login, cleared on logout).
+// Checks `refresh_token` HttpOnly cookie (set by backend on login).
 // Subscription checks remain client-side in AuthProvider.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -10,9 +10,9 @@ import type { NextRequest } from "next/server";
 
 const PUBLIC_ROUTES = ["/login"];
 
-export function proxy(request: NextRequest) {
+export default function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const hasSession = request.cookies.has("auth_session");
+  const hasSession = request.cookies.has("refresh_token");
   const isPublic = PUBLIC_ROUTES.some(
     (r) => pathname === r || pathname.startsWith(`${r}/`),
   );
