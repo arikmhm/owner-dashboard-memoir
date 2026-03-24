@@ -7,6 +7,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useCallback } from "react";
+
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -53,8 +54,6 @@ export default function KiosksPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editKiosk, setEditKiosk] = useState<Kiosk | null>(null);
   const [pairingKiosk, setPairingKiosk] = useState<Kiosk | null>(null);
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-
   const maxReached = activeCount >= maxKiosks && maxKiosks > 0;
 
   // ── Handlers ───────────────────────────────────────────────────────────
@@ -68,18 +67,6 @@ export default function KiosksPage() {
 
   const handleGeneratePairing = useCallback((kiosk: Kiosk) => {
     setPairingKiosk(kiosk);
-  }, []);
-
-  const handleToggleExpand = useCallback((id: string) => {
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
   }, []);
 
   // ── Render ─────────────────────────────────────────────────────────────
@@ -166,8 +153,6 @@ export default function KiosksPage() {
             <KioskCard
               key={kiosk.id}
               kiosk={kiosk}
-              expanded={expandedIds.has(kiosk.id)}
-              onToggleExpand={() => handleToggleExpand(kiosk.id)}
               onEdit={handleEditKiosk}
               onGeneratePairing={handleGeneratePairing}
             />
