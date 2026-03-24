@@ -30,6 +30,8 @@ interface TemplatePreviewProps {
   isLoading?: boolean;
   /** Whether the template is inactive (applies dimming overlay) */
   inactive?: boolean;
+  /** Max height/width ratio — tall templates shrink to fit within this cap */
+  maxRatio?: number;
 }
 
 export default function TemplatePreview({
@@ -40,6 +42,7 @@ export default function TemplatePreview({
   elements,
   isLoading = false,
   inactive = false,
+  maxRatio,
 }: TemplatePreviewProps) {
   const sorted = useMemo(
     () => [...elements].sort((a, b) => a.sequence - b.sequence),
@@ -49,54 +52,74 @@ export default function TemplatePreview({
   // Scale factors: element px → percentage of canvas
   const toPercent = (val: number, base: number) => (val / base) * 100;
 
+  const ratio = canvasHeight / canvasWidth;
+  const isCapped = maxRatio != null && ratio > maxRatio;
+  const displayRatio = isCapped ? maxRatio! : ratio;
+
+  // When capped, shrink the content to fit (with margin) and center
+  const pad = 0.06; // 6% vertical padding top+bottom
+  const innerScale = isCapped ? (maxRatio! / ratio) * (1 - pad * 2) : 1;
+  const contentStyle: React.CSSProperties = isCapped
+    ? {
+        position: "absolute",
+        top: `${pad * 100}%`,
+        left: `${((1 - innerScale) / 2) * 100}%`,
+        width: `${innerScale * 100}%`,
+        height: `${(1 - pad * 2) * 100}%`,
+      }
+    : { position: "absolute", inset: 0 };
+
   return (
     <div
       className="relative overflow-hidden bg-zinc-100 w-full"
-      style={{ paddingBottom: `${(canvasHeight / canvasWidth) * 100}%` }}
+      style={{ paddingBottom: `${displayRatio * 100}%` }}
     >
-      {/* Background image */}
-      {backgroundUrl && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={backgroundUrl}
-          alt=""
-          draggable={false}
-          className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none"
-        />
-      )}
-
-      {/* Loading skeleton overlay */}
-      {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <Skeleton className="w-full h-full absolute inset-0 opacity-40" />
-        </div>
-      )}
-
-      {/* Elements */}
-      {!isLoading &&
-        sorted.map((el) => (
-          <ElementPreview
-            key={el.id}
-            element={el}
-            canvasWidth={canvasWidth}
-            canvasHeight={canvasHeight}
-            toPercent={toPercent}
+      {/* Content wrapper — scales down for tall templates */}
+      <div style={contentStyle}>
+        {/* Background image */}
+        {backgroundUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={backgroundUrl}
+            alt=""
+            draggable={false}
+            className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none"
           />
-        ))}
+        )}
 
-      {/* Overlay image (on top of elements) */}
-      {overlayUrl && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={overlayUrl}
-          alt=""
-          draggable={false}
-          className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none"
-          style={{ zIndex: 50 }}
-        />
-      )}
+        {/* Loading skeleton overlay */}
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Skeleton className="w-full h-full absolute inset-0 opacity-40" />
+          </div>
+        )}
 
-      {/* Inactive overlay */}
+        {/* Elements */}
+        {!isLoading &&
+          sorted.map((el) => (
+            <ElementPreview
+              key={el.id}
+              element={el}
+              canvasWidth={canvasWidth}
+              canvasHeight={canvasHeight}
+              toPercent={toPercent}
+            />
+          ))}
+
+        {/* Overlay image (on top of elements) */}
+        {overlayUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={overlayUrl}
+            alt=""
+            draggable={false}
+            className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none"
+            style={{ zIndex: 50 }}
+          />
+        )}
+      </div>
+
+      {/* Inactive overlay — on outer container to cover full area */}
       {inactive && (
         <div
           className="absolute inset-0 bg-white/50 flex items-center justify-center"

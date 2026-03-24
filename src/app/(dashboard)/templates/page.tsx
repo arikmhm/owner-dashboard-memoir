@@ -65,7 +65,7 @@ function TemplateCard({
   return (
     <article
       className={cn(
-        "group flex flex-col bg-white border border-zinc-200 rounded-lg overflow-hidden",
+        "group flex flex-col bg-white border border-zinc-200 overflow-hidden",
         "hover:border-zinc-300 hover:shadow-md transition-all duration-200",
         !template.isActive && "opacity-55",
       )}
@@ -80,6 +80,7 @@ function TemplateCard({
         elements={elements}
         isLoading={elementsLoading}
         inactive={!template.isActive}
+        maxRatio={1.2}
       />
 
       {/* ── Card Info ── */}
@@ -167,7 +168,7 @@ function TemplateCard({
 // ── Skeleton card ──────────────────────────────────────────────────────────────
 function TemplateCardSkeleton() {
   return (
-    <div className="flex flex-col bg-white border border-zinc-200 rounded-lg overflow-hidden">
+    <div className="flex flex-col bg-white border border-zinc-200 overflow-hidden">
       <Skeleton className="w-full" style={{ paddingBottom: "66%" }} />
       <div className="px-3.5 pt-3 pb-2.5 space-y-2">
         <div className="flex items-start justify-between">
