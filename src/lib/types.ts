@@ -13,7 +13,7 @@ export type SubscriptionStatus =
   | "EXPIRED"
   | "CANCELLED"
   | "GRACE_PERIOD";
-export type TxStatus = "PENDING" | "PAID" | "FAILED";
+export type TxStatus = "PENDING" | "PAID" | "FAILED" | "EXPIRED";
 export type PaymentMethod = "PG" | "CASH" | "STATIC_QRIS";
 export type MutationType = "CREDIT" | "DEBIT";
 export type MutationCategory =

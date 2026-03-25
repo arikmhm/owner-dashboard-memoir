@@ -42,6 +42,7 @@ const STATUS_OPTIONS: { value: TxStatus; label: string }[] = [
   { value: "PAID", label: "Lunas" },
   { value: "PENDING", label: "Menunggu" },
   { value: "FAILED", label: "Gagal" },
+  { value: "EXPIRED", label: "Kedaluwarsa" },
 ];
 
 const PAYMENT_OPTIONS: { value: PaymentMethod; label: string }[] = [

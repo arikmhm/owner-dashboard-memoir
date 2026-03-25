@@ -19,6 +19,10 @@ export const TX_STATUS_CONFIG: Record<
     label: "Gagal",
     className: "bg-red-100 text-red-700",
   },
+  EXPIRED: {
+    label: "Kedaluwarsa",
+    className: "bg-zinc-100 text-zinc-400",
+  },
 };
 
 export const WITHDRAWAL_STATUS_CONFIG: Record<
@@ -40,6 +44,7 @@ export const INVOICE_STATUS_CONFIG: Record<
   PAID: { label: "Lunas", className: "bg-emerald-100 text-emerald-700" },
   PENDING: { label: "Menunggu", className: "bg-yellow-100 text-yellow-700" },
   FAILED: { label: "Gagal", className: "bg-red-100 text-red-700" },
+  EXPIRED: { label: "Kedaluwarsa", className: "bg-zinc-100 text-zinc-400" },
 };
 
 export const SUBSCRIPTION_STATUS_CONFIG: Record<
