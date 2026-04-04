@@ -17,7 +17,7 @@ import {
 } from "@/lib/template-variables";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
-export type ElementType = "photo_slot" | "image" | "text" | "shape";
+export type ElementType = "PHOTO_SLOT" | "IMAGE" | "TEXT" | "SHAPE";
 
 export interface TemplateElement {
   id: string;
@@ -129,7 +129,7 @@ export default function EditorCanvas({
   // Load element images (for image type elements)
   useEffect(() => {
     const imageElements = elements.filter(
-      (el) => el.elementType === "image" && el.properties.url,
+      (el) => el.elementType === "IMAGE" && el.properties.url,
     );
     for (const el of imageElements) {
       const url = el.properties.url as string;
@@ -313,7 +313,7 @@ export default function EditorCanvas({
         {sortedElements.map((el) => {
           const isSelected = el.id === selectedId;
 
-          if (el.elementType === "photo_slot") {
+          if (el.elementType === "PHOTO_SLOT") {
             return (
               <Rect
                 key={el.id}
@@ -338,7 +338,7 @@ export default function EditorCanvas({
             );
           }
 
-          if (el.elementType === "text") {
+          if (el.elementType === "TEXT") {
             const props = el.properties as {
               content?: string;
               fontFamily?: string;
@@ -384,7 +384,7 @@ export default function EditorCanvas({
             );
           }
 
-          if (el.elementType === "image") {
+          if (el.elementType === "IMAGE") {
             const elImg = elementImages[el.id];
             return (
               <KonvaImage
@@ -409,7 +409,7 @@ export default function EditorCanvas({
             );
           }
 
-          if (el.elementType === "shape") {
+          if (el.elementType === "SHAPE") {
             const shapeProps = el.properties as {
               fill?: string;
               stroke?: string;

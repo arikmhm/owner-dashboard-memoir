@@ -162,7 +162,7 @@ function ElementPreview({
   };
 
   // ── photo_slot ─────────────────────────────────────────────────────────
-  if (el.elementType === "photo_slot") {
+  if (el.elementType === "PHOTO_SLOT") {
     const props = el.properties as {
       borderRadius?: number;
       borderWidth?: number;
@@ -192,7 +192,7 @@ function ElementPreview({
   }
 
   // ── text ────────────────────────────────────────────────────────────────
-  if (el.elementType === "text") {
+  if (el.elementType === "TEXT") {
     const props = el.properties as {
       content?: string;
       fontFamily?: string;
@@ -241,7 +241,7 @@ function ElementPreview({
   }
 
   // ── image ───────────────────────────────────────────────────────────────
-  if (el.elementType === "image") {
+  if (el.elementType === "IMAGE") {
     const props = el.properties as { url?: string };
 
     if (!props.url) {
@@ -275,7 +275,7 @@ function ElementPreview({
   }
 
   // ── shape ───────────────────────────────────────────────────────────────
-  if (el.elementType === "shape") {
+  if (el.elementType === "SHAPE") {
     const props = el.properties as {
       fill?: string;
       stroke?: string;

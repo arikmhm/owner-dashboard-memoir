@@ -36,7 +36,6 @@ interface AuthState {
   user: AuthUser | null;
   subscription: Subscription | null;
   subscriptionStatus: SubscriptionStatus | null;
-  gracePeriodDaysRemaining: number;
   /** PENDING_PAYMENT subscription for in-flight upgrade; null if none */
   pendingUpgrade: Subscription | null;
   isLoading: boolean;
@@ -93,7 +92,7 @@ function isAuthOnlyRoute(pathname: string): boolean {
 
 /** Check if subscription status allows access to dashboard */
 function hasActiveSubscription(status: SubscriptionStatus | null): boolean {
-  return status === "ACTIVE" || status === "GRACE_PERIOD";
+  return status === "ACTIVE";
 }
 
 // ── Provider component ───────────────────────────────────────────────────────
@@ -106,7 +105,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [subscriptionStatus, setSubscriptionStatus] =
     useState<SubscriptionStatus | null>(null);
-  const [gracePeriodDaysRemaining, setGracePeriodDaysRemaining] = useState(0);
   const [pendingUpgrade, setPendingUpgrade] = useState<Subscription | null>(
     null,
   );
@@ -138,7 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // Decode JWT for user info (id + role; email is only available during login)
+      // Decode JWT for user info (id, role, email)
       const restored = decodeTokenUser(token);
       if (!restored) {
         removeToken();
@@ -158,9 +156,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (subResponse) {
           setSubscription(subResponse.subscription);
           setSubscriptionStatus(subResponse.subscriptionStatus);
-          setGracePeriodDaysRemaining(
-            subResponse.gracePeriodDaysRemaining ?? 0,
-          );
           setPendingUpgrade(subResponse.pendingUpgrade ?? null);
         }
       } catch (err) {
@@ -192,7 +187,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       setSubscription(null);
       setSubscriptionStatus(null);
-      setGracePeriodDaysRemaining(0);
       setPendingUpgrade(null);
       // isAuthenticated becomes false → route protection effect redirects to /login
     };
@@ -281,9 +275,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (subResponse) {
         setSubscription(subResponse.subscription);
         setSubscriptionStatus(subResponse.subscriptionStatus);
-        setGracePeriodDaysRemaining(
-          subResponse.gracePeriodDaysRemaining ?? 0,
-        );
         setPendingUpgrade(subResponse.pendingUpgrade ?? null);
       }
       setUser(authUser);
@@ -316,7 +307,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (subResponse) {
         setSubscription(subResponse.subscription);
         setSubscriptionStatus(subResponse.subscriptionStatus);
-        setGracePeriodDaysRemaining(subResponse.gracePeriodDaysRemaining ?? 0);
         setPendingUpgrade(subResponse.pendingUpgrade ?? null);
       } else {
         setSubscription(null);
@@ -336,7 +326,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     subscription,
     subscriptionStatus,
-    gracePeriodDaysRemaining,
     pendingUpgrade,
     isLoading,
     isAuthenticated,

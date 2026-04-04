@@ -8,7 +8,7 @@
 // Best practices: client-swr-dedup, rerender-functional-setstate
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import {
   ArrowUpCircle,
   ChevronLeft,
@@ -68,7 +68,6 @@ export default function SubscriptionPage() {
   const {
     subscription,
     subscriptionStatus,
-    gracePeriodDaysRemaining,
     pendingUpgrade,
     refreshSubscription,
   } = useAuth();
@@ -312,14 +311,6 @@ export default function SubscriptionPage() {
                   </div>
                 )}
 
-              {subscriptionStatus === "GRACE_PERIOD" && (
-                <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-xs text-yellow-800 flex items-center gap-2">
-                  <AlertCircle className="size-3.5 shrink-0" />
-                  Masa tenggang tersisa {gracePeriodDaysRemaining} hari.
-                  Perpanjang segera agar kiosk tetap aktif.
-                </div>
-              )}
-
               {subscriptionStatus === "EXPIRED" && (
                 <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 flex items-center gap-2">
                   <AlertCircle className="size-3.5 shrink-0" />
@@ -338,8 +329,7 @@ export default function SubscriptionPage() {
                   disabled={!!pendingUpgrade}
                 >
                   <ArrowUpCircle className="h-3.5 w-3.5 mr-1" />
-                  {subscriptionStatus === "EXPIRED" ||
-                  subscriptionStatus === "GRACE_PERIOD"
+                  {subscriptionStatus === "EXPIRED"
                     ? "Perpanjang"
                     : "Upgrade Plan"}
                 </Button>
@@ -779,9 +769,39 @@ function PendingUpgradeBanner({
   checkingInvoiceId: string | null;
   onCheckPayment: (invoiceId: string) => void;
 }) {
+  const { refreshSubscription } = useAuth();
   const { display: countdown, isExpired } = useCountdown(
     pendingUpgradeInvoice?.paymentExpiresAt ?? null,
   );
+
+  // Auto-poll payment status every 5 seconds
+  useEffect(() => {
+    if (!pendingUpgradeInvoice || isExpired) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const result = await checkPaymentStatus(pendingUpgradeInvoice.id);
+
+        if (result.status === "PAID") {
+          toast.success("Pembayaran berhasil! Subscription aktif.");
+          await refreshSubscription();
+        } else if (
+          result.status === "FAILED" ||
+          result.status === "EXPIRED"
+        ) {
+          toast.error("Pembayaran gagal atau kadaluarsa.");
+        }
+
+        if (result.status !== "PENDING") {
+          clearInterval(interval);
+        }
+      } catch {
+        // Silent fail — manual button still available
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [pendingUpgradeInvoice, isExpired, refreshSubscription]);
 
   return (
     <div className="border border-yellow-200 rounded-xl bg-yellow-50 overflow-hidden">

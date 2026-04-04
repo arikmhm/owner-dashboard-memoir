@@ -33,13 +33,11 @@ function SubscriptionBanner({
   planName,
   daysLeft,
   periodEnd,
-  graceDaysRemaining,
 }: {
   status: string;
   planName: string;
   daysLeft: number;
   periodEnd: string;
-  graceDaysRemaining: number;
 }) {
   const periodEndFormatted = periodEnd
     ? new Date(periodEnd).toLocaleDateString("id-ID", {
@@ -98,33 +96,6 @@ function SubscriptionBanner({
             asChild
           >
             <Link href="/subscription">Bayar</Link>
-          </Button>
-        </div>
-      );
-
-    case "GRACE_PERIOD":
-      return (
-        <div
-          role="alert"
-          className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3"
-        >
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-amber-800">
-              Subscription dalam masa tenggang
-            </p>
-            <p className="mt-0.5 text-xs text-amber-600">
-              {graceDaysRemaining} hari tersisa sebelum booth terkunci. Segera
-              perpanjang subscription.
-            </p>
-          </div>
-          <Button
-            size="sm"
-            variant="outline"
-            className="shrink-0 border-amber-300 text-amber-700 hover:bg-amber-100"
-            asChild
-          >
-            <Link href="/subscription">Perpanjang</Link>
           </Button>
         </div>
       );
@@ -257,7 +228,6 @@ export default function DashboardPage() {
         ),
       )
     : 0;
-  const graceDays = summary?.gracePeriodDaysRemaining ?? 0;
 
   // Current month/day labels for stat cards
   const currentMonth = new Date().toLocaleDateString("id-ID", {
@@ -359,7 +329,6 @@ export default function DashboardPage() {
           planName={planName}
           daysLeft={daysLeft}
           periodEnd={periodEnd}
-          graceDaysRemaining={graceDays}
         />
       )}
 

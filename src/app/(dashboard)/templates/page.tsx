@@ -54,7 +54,7 @@ function TemplateCard({
     template.id,
   );
   const slotCount = elements.filter(
-    (el) => el.elementType === "photo_slot",
+    (el) => el.elementType === "PHOTO_SLOT",
   ).length;
   const hasOverride =
     template.overridePriceBase != null ||

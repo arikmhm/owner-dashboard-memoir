@@ -11,8 +11,7 @@ export type SubscriptionStatus =
   | "ACTIVE"
   | "PENDING_PAYMENT"
   | "EXPIRED"
-  | "CANCELLED"
-  | "GRACE_PERIOD";
+  | "CANCELLED";
 export type TxStatus = "PENDING" | "PAID" | "FAILED" | "EXPIRED";
 export type PaymentMethod = "PG" | "CASH" | "STATIC_QRIS";
 export type MutationType = "CREDIT" | "DEBIT";
@@ -21,7 +20,7 @@ export type MutationCategory =
   | "WITHDRAWAL"
   | "ADJUSTMENT";
 export type WithdrawalStatus = "PENDING" | "PROCESSED" | "REJECTED";
-export type ElementType = "photo_slot" | "image" | "text" | "shape";
+export type ElementType = "PHOTO_SLOT" | "IMAGE" | "TEXT" | "SHAPE";
 export type AssetFolder = "backgrounds" | "overlays" | "elements";
 
 // ── Dashboard ────────────────────────────────────────────────────────────────
@@ -35,7 +34,6 @@ export interface DashboardSummary {
   planName: string | null;
   subscriptionStatus: SubscriptionStatus;
   currentPeriodEnd: string | null;
-  gracePeriodDaysRemaining: number;
   pendingUpgrade: Subscription | null;
 }
 
@@ -92,7 +90,6 @@ export interface Subscription {
 export interface SubscriptionResponse {
   subscription: Subscription | null;
   subscriptionStatus: SubscriptionStatus;
-  gracePeriodDaysRemaining: number;
   /** PENDING_PAYMENT subscription if an upgrade is in-flight; null otherwise */
   pendingUpgrade: Subscription | null;
 }
@@ -128,7 +125,7 @@ export interface CreateSubscriptionResponse {
 
 export interface CheckPaymentResponse {
   data: {
-    status: "PAID" | "PENDING" | "FAILED";
+    status: "PAID" | "PENDING" | "FAILED" | "EXPIRED";
     subscription: Subscription | null;
   };
 }

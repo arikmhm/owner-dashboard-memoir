@@ -84,9 +84,9 @@ function createElement(
     sequence: maxSeq + 1,
   };
 
-  if (type === "photo_slot") {
+  if (type === "PHOTO_SLOT") {
     const existingSlots = existingElements.filter(
-      (e) => e.elementType === "photo_slot",
+      (e) => e.elementType === "PHOTO_SLOT",
     );
     const maxCaptureOrder = existingSlots.reduce(
       (max, el) => Math.max(max, (el.properties.captureOrder as number) ?? 0),
@@ -100,7 +100,7 @@ function createElement(
     };
   }
 
-  if (type === "image") {
+  if (type === "IMAGE") {
     return {
       ...base,
       width: Math.min(150, canvasW - 60),
@@ -109,7 +109,7 @@ function createElement(
     };
   }
 
-  if (type === "shape") {
+  if (type === "SHAPE") {
     return {
       ...base,
       width: Math.min(120, canvasW - 60),
@@ -262,9 +262,9 @@ export function StepEditor({
 
   const removeElement = (id: string) => {
     const el = elements.find((e) => e.id === id);
-    if (el?.elementType === "photo_slot") {
+    if (el?.elementType === "PHOTO_SLOT") {
       const photoSlotCount = elements.filter(
-        (e) => e.elementType === "photo_slot",
+        (e) => e.elementType === "PHOTO_SLOT",
       ).length;
       if (photoSlotCount <= 1) {
         toast.error("Template harus memiliki minimal 1 slot foto.");
@@ -346,14 +346,14 @@ export function StepEditor({
       return;
     }
 
-    const photoSlots = elements.filter((el) => el.elementType === "photo_slot");
+    const photoSlots = elements.filter((el) => el.elementType === "PHOTO_SLOT");
     if (photoSlots.length === 0) {
       toast.error("Template harus memiliki minimal 1 slot foto (photo_slot).");
       return;
     }
 
     // Validate image elements have URLs
-    const imageEls = elements.filter((el) => el.elementType === "image");
+    const imageEls = elements.filter((el) => el.elementType === "IMAGE");
     const emptyImages = imageEls.filter((el) => !el.properties.url);
     if (emptyImages.length > 0) {
       toast.error("Semua elemen gambar harus memiliki file yang diunggah.");
@@ -411,11 +411,11 @@ export function StepEditor({
         properties: {
           ...el.properties,
           // Replace data URLs with uploaded URLs for image elements
-          ...(el.elementType === "image" && imageUrls.has(el.id)
+          ...(el.elementType === "IMAGE" && imageUrls.has(el.id)
             ? { url: imageUrls.get(el.id)! }
             : {}),
           // Ensure photo_slots always have a sequential captureOrder
-          ...(el.elementType === "photo_slot"
+          ...(el.elementType === "PHOTO_SLOT"
             ? { captureOrder: ++captureOrderCounter }
             : {}),
         },
@@ -720,7 +720,7 @@ export function StepEditor({
               <Button
                 size="xs"
                 variant="outline"
-                onClick={() => addElement("photo_slot")}
+                onClick={() => addElement("PHOTO_SLOT")}
                 className="gap-1 h-8"
               >
                 <ImageIcon className="size-3" /> Foto Slot
@@ -728,7 +728,7 @@ export function StepEditor({
               <Button
                 size="xs"
                 variant="outline"
-                onClick={() => addElement("text")}
+                onClick={() => addElement("TEXT")}
                 className="gap-1 h-8"
               >
                 <TypeIcon className="size-3" /> Teks
@@ -736,7 +736,7 @@ export function StepEditor({
               <Button
                 size="xs"
                 variant="outline"
-                onClick={() => addElement("image")}
+                onClick={() => addElement("IMAGE")}
                 className="gap-1 h-8"
               >
                 <Upload className="size-3" /> Gambar
@@ -744,7 +744,7 @@ export function StepEditor({
               <Button
                 size="xs"
                 variant="outline"
-                onClick={() => addElement("shape")}
+                onClick={() => addElement("SHAPE")}
                 className="gap-1 h-8"
               >
                 <Square className="size-3" /> Bentuk
@@ -782,32 +782,32 @@ export function StepEditor({
                         <span
                           className={cn(
                             "font-mono text-[10px] font-bold size-4.5 flex items-center justify-center rounded",
-                            el.elementType === "photo_slot"
+                            el.elementType === "PHOTO_SLOT"
                               ? "bg-blue-500 text-white"
-                              : el.elementType === "text"
+                              : el.elementType === "TEXT"
                                 ? "bg-amber-500 text-white"
-                                : el.elementType === "image"
+                                : el.elementType === "IMAGE"
                                   ? "bg-violet-500 text-white"
                                   : "bg-zinc-500 text-white",
                           )}
                         >
-                          {el.elementType === "photo_slot"
+                          {el.elementType === "PHOTO_SLOT"
                             ? "F"
-                            : el.elementType === "text"
+                            : el.elementType === "TEXT"
                               ? "T"
-                              : el.elementType === "image"
+                              : el.elementType === "IMAGE"
                                 ? "I"
                                 : "S"}
                         </span>
                         <div className="leading-none">
                           <span className="text-xs text-zinc-700 font-medium">
-                            {el.elementType === "photo_slot"
-                              ? `Foto ${elements.filter((e, i) => e.elementType === "photo_slot" && i <= idx).length}`
-                              : el.elementType === "text"
+                            {el.elementType === "PHOTO_SLOT"
+                              ? `Foto ${elements.filter((e, i) => e.elementType === "PHOTO_SLOT" && i <= idx).length}`
+                              : el.elementType === "TEXT"
                                 ? (
                                     (el.properties.content as string) || "Teks"
                                   ).slice(0, 15)
-                                : el.elementType === "image"
+                                : el.elementType === "IMAGE"
                                   ? "Gambar"
                                   : "Bentuk"}
                           </span>
@@ -838,11 +838,11 @@ export function StepEditor({
               <div className="px-3 py-2 border-b border-blue-100 bg-blue-50/50 flex items-center gap-1.5">
                 <MousePointer2 className="size-3 text-blue-500" />
                 <p className="text-xs font-semibold text-blue-700 uppercase tracking-wider">
-                  {selectedEl.elementType === "photo_slot"
+                  {selectedEl.elementType === "PHOTO_SLOT"
                     ? "Foto Slot"
-                    : selectedEl.elementType === "text"
+                    : selectedEl.elementType === "TEXT"
                       ? "Teks"
-                      : selectedEl.elementType === "image"
+                      : selectedEl.elementType === "IMAGE"
                         ? "Gambar"
                         : "Bentuk"}
                 </p>
@@ -918,7 +918,7 @@ export function StepEditor({
                 </div>
 
                 {/* Text properties */}
-                {selectedEl.elementType === "text" && (
+                {selectedEl.elementType === "TEXT" && (
                   <>
                     <hr className="border-blue-100" />
                     <div className="space-y-1">
@@ -1118,7 +1118,7 @@ export function StepEditor({
                 )}
 
                 {/* Image properties */}
-                {selectedEl.elementType === "image" && (
+                {selectedEl.elementType === "IMAGE" && (
                   <>
                     <hr className="border-blue-100" />
                     <div className="space-y-1.5">
@@ -1181,7 +1181,7 @@ export function StepEditor({
                 )}
 
                 {/* Shape properties */}
-                {selectedEl.elementType === "shape" && (
+                {selectedEl.elementType === "SHAPE" && (
                   <>
                     <hr className="border-blue-100" />
                     <div className="space-y-0.5">

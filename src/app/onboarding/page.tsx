@@ -41,7 +41,7 @@ function OnboardingContent() {
   } = useAuth();
 
   const hasActiveSub =
-    subscriptionStatus === "ACTIVE" || subscriptionStatus === "GRACE_PERIOD";
+    subscriptionStatus === "ACTIVE";
 
   const [step, setStep] = useState<OnboardingStep>("select-plan");
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("MONTHLY");
@@ -155,6 +155,39 @@ function OnboardingContent() {
       setPaymentStatus("idle");
     }
   }, [pendingInvoiceId, refreshSubscription]);
+
+  // ── Auto-poll payment status every 5 seconds ────────────────────────────
+  useEffect(() => {
+    if (
+      step !== "checking-payment" ||
+      !pendingInvoiceId ||
+      isExpired ||
+      paymentStatus === "paid" ||
+      paymentStatus === "failed"
+    ) {
+      return;
+    }
+
+    const interval = setInterval(async () => {
+      try {
+        const result = await checkPaymentStatus(pendingInvoiceId);
+
+        if (result.status === "PAID") {
+          setPaymentStatus("paid");
+          await refreshSubscription();
+          setTimeout(() => {
+            window.location.href = "/";
+          }, 1500);
+        } else if (result.status === "FAILED" || result.status === "EXPIRED") {
+          setPaymentStatus("failed");
+        }
+      } catch {
+        // Silent fail — manual button is still available as fallback
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [step, pendingInvoiceId, isExpired, paymentStatus, refreshSubscription]);
 
   const handleBackToPlans = useCallback(() => {
     setStep("select-plan");
