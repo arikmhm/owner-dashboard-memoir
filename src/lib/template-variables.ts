@@ -15,22 +15,9 @@ export const TEMPLATE_VARIABLES: TemplateVariable[] = [
     { key: "time", label: "Jam", category: "Waktu", example: "14:30" },
     { key: "datetime", label: "Tanggal & Jam", category: "Waktu", example: "23 Feb 2026, 14:30" },
 
-    // Transaksi
-    { key: "order_id", label: "Order ID", category: "Transaksi", example: "ORD-20260223-001" },
-    { key: "total_amount", label: "Total Bayar", category: "Transaksi", example: "Rp 25.000" },
-    { key: "payment_method", label: "Metode Bayar", category: "Transaksi", example: "QRIS" },
-    { key: "print_qty", label: "Jumlah Cetak", category: "Transaksi", example: "2" },
-
-    // Kiosk & Template
-    { key: "kiosk_name", label: "Nama Kiosk", category: "Kiosk", example: "Booth Utama — Lantai 1" },
-    { key: "template_name", label: "Nama Template", category: "Kiosk", example: "Classic Stripe" },
-    { key: "owner_name", label: "Nama Studio", category: "Kiosk", example: "Memoir Studio" },
-    { key: "session_number", label: "No. Sesi", category: "Kiosk", example: "#042" },
-
-    // Pelanggan
-    { key: "customer_name", label: "Nama Pelanggan", category: "Pelanggan", example: "Budi Santoso" },
-    { key: "customer_phone", label: "No. HP Pelanggan", category: "Pelanggan", example: "081234567890" },
-    { key: "customer_email", label: "Email Pelanggan", category: "Pelanggan", example: "budi@email.com" },
+    // Branding & Personalisasi
+    { key: "owner_name", label: "Nama Studio", category: "Branding", example: "Memoir Studio" },
+    { key: "customer_name", label: "Nama Pelanggan", category: "Branding", example: "Budi Santoso" },
 ];
 
 // ── Dummy context for editor preview ────────────────────────────────────────────

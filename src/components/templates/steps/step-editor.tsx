@@ -30,11 +30,11 @@ import {
   ZoomIn,
   ZoomOut,
   Maximize,
+  Hand,
   Magnet,
   Loader2,
-  Square,
+  ChevronRight,
   Upload,
-  Circle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -109,20 +109,6 @@ function createElement(
     };
   }
 
-  if (type === "SHAPE") {
-    return {
-      ...base,
-      width: Math.min(120, canvasW - 60),
-      height: Math.min(120, canvasH - 60),
-      properties: {
-        shapeType: "rect",
-        fill: "rgba(0,0,0,0.1)",
-        stroke: "transparent",
-        strokeWidth: 0,
-        cornerRadius: 0,
-      },
-    };
-  }
 
   // text
   return {
@@ -131,7 +117,7 @@ function createElement(
     height: 40,
     properties: {
       content: "Teks baru",
-      fontFamily: "Inter",
+      fontFamily: "Courier New",
       fontSize: 24,
       fontWeight: "400",
       color: "#000000",
@@ -212,16 +198,17 @@ export function StepEditor({
   const [previewMode, setPreviewMode] = useState(false);
   const [showVarDropdown, setShowVarDropdown] = useState(false);
   const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [panMode, setPanMode] = useState(false);
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [overlayDataUrl, setOverlayDataUrl] = useState<string | null>(
-    editTemplate?.overlayUrl ?? null,
-  );
+  const [showTemplateOptions, setShowTemplateOptions] = useState(false);
   const contentInputRef = useRef<HTMLInputElement>(null);
   const canvasAreaRef = useRef<HTMLDivElement>(null);
   const imageUploadRef = useRef<HTMLInputElement>(null);
-  const overlayUploadRef = useRef<HTMLInputElement>(null);
   const elementCounterRef = useRef(editElements?.length ?? 0);
+  const isPanningRef = useRef(false);
+  const panStartRef = useRef({ x: 0, y: 0 });
 
   const canvasW = croppedImage.width;
   const canvasH = croppedImage.height;
@@ -245,7 +232,45 @@ export function StepEditor({
 
   const zoomIn = () => setZoom((z) => Math.min(z + ZOOM_STEP, ZOOM_MAX));
   const zoomOut = () => setZoom((z) => Math.max(z - ZOOM_STEP, ZOOM_MIN));
-  const zoomFit = () => setZoom(computeFitZoom());
+  const zoomFit = () => {
+    setZoom(computeFitZoom());
+    setPan({ x: 0, y: 0 });
+  };
+
+  // ── Pan & wheel zoom handlers ──
+  const handleCanvasPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      // Middle-click always pans; left-click pans only in pan mode
+      const shouldPan = e.button === 1 || (e.button === 0 && panMode);
+      if (!shouldPan) return;
+      e.preventDefault();
+      isPanningRef.current = true;
+      panStartRef.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    },
+    [pan, panMode],
+  );
+
+  const handleCanvasPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!isPanningRef.current) return;
+      setPan({
+        x: e.clientX - panStartRef.current.x,
+        y: e.clientY - panStartRef.current.y,
+      });
+    },
+    [],
+  );
+
+  const handleCanvasPointerUp = useCallback(() => {
+    isPanningRef.current = false;
+  }, []);
+
+  const handleWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const delta = -e.deltaY * 0.001;
+    setZoom((z) => Math.min(Math.max(z + delta, ZOOM_MIN), ZOOM_MAX));
+  }, []);
 
   // ── Element CRUD ──
   const addElement = (type: ElementType) => {
@@ -283,18 +308,6 @@ export function StepEditor({
     reader.onload = () => {
       const dataUrl = reader.result as string;
       updateProperty(selectedId, "url", dataUrl);
-    };
-    reader.readAsDataURL(file);
-    e.target.value = "";
-  };
-
-  // ── Overlay upload ──
-  const handleOverlayUpload = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      setOverlayDataUrl(reader.result as string);
     };
     reader.readAsDataURL(file);
     e.target.value = "";
@@ -366,7 +379,6 @@ export function StepEditor({
       // 1. Upload background to Supabase Storage (async-parallel: independent uploads)
       const uploadPromises: Promise<void>[] = [];
       let backgroundUrl = croppedImage.dataUrl;
-      let overlayUrl: string | null = overlayDataUrl;
 
       // Upload background
       const bgUploadPromise = uploadDataUrlAsset(
@@ -376,17 +388,6 @@ export function StepEditor({
         backgroundUrl = url;
       });
       uploadPromises.push(bgUploadPromise);
-
-      // Upload overlay if present
-      if (overlayDataUrl) {
-        const overlayUploadPromise = uploadDataUrlAsset(
-          overlayDataUrl,
-          "overlays",
-        ).then((url) => {
-          overlayUrl = url;
-        });
-        uploadPromises.push(overlayUploadPromise);
-      }
 
       // Upload image element assets (parallel)
       const imageUrls = new Map<string, string>();
@@ -426,7 +427,6 @@ export function StepEditor({
         width: canvasW,
         height: canvasH,
         backgroundUrl,
-        overlayUrl,
         overridePriceBase: overridePriceBase ? Number(overridePriceBase) : null,
         overridePriceExtraPrint: overridePriceExtraPrint
           ? Number(overridePriceExtraPrint)
@@ -475,7 +475,7 @@ export function StepEditor({
 
       // Invalidate all template & element caches so the list page
       // fetches fresh data including newly created/updated elements
-      await queryClient.invalidateQueries({ queryKey: ["/owner/templates"] });
+      await queryClient.invalidateQueries({ queryKey: ["templates"] });
 
       router.push("/templates");
     } catch (err) {
@@ -500,14 +500,22 @@ export function StepEditor({
       {/* ═══ LEFT — Canvas Workspace ═══ */}
       <div
         ref={canvasAreaRef}
-        className="flex-1 bg-zinc-100 relative overflow-hidden flex items-center justify-center"
+        className={cn(
+          "flex-1 bg-zinc-100 relative overflow-hidden flex items-center justify-center",
+          panMode ? "cursor-grab active:cursor-grabbing" : "",
+        )}
+        style={panMode ? { pointerEvents: "auto" } : undefined}
+        onPointerDown={handleCanvasPointerDown}
+        onPointerMove={handleCanvasPointerMove}
+        onPointerUp={handleCanvasPointerUp}
+        onWheel={handleWheel}
       >
         <div
           style={{
-            transform: `scale(${zoom})`,
+            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
             transformOrigin: "center center",
           }}
-          className="shadow-2xl"
+          className={cn("shadow-2xl", panMode && "pointer-events-none")}
         >
           <EditorCanvas
             width={canvasW}
@@ -550,6 +558,18 @@ export function StepEditor({
             <Maximize className="size-3.5" />
           </button>
           <div className="h-4 w-px bg-zinc-200 mx-0.5" />
+          <button
+            onClick={() => setPanMode(!panMode)}
+            title={panMode ? "Mode geser (aktif)" : "Mode geser"}
+            className={cn(
+              "size-7 flex items-center justify-center rounded-md transition-colors",
+              panMode
+                ? "bg-blue-50 text-blue-600 hover:bg-blue-100"
+                : "text-zinc-400 hover:bg-zinc-100",
+            )}
+          >
+            <Hand className="size-3.5" />
+          </button>
           <button
             onClick={() => setSnapEnabled(!snapEnabled)}
             title={snapEnabled ? "Snap aktif" : "Snap nonaktif"}
@@ -607,105 +627,86 @@ export function StepEditor({
                   className="h-8 text-sm"
                 />
               </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-zinc-500">
-                  Override Harga Dasar
-                </label>
-                <Input
-                  type="number"
-                  placeholder="Kosongkan = default"
-                  value={overridePriceBase}
-                  onChange={(e) => setOverridePriceBase(e.target.value)}
-                  className="h-8 text-sm"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-zinc-500">
-                  Override Extra Print
-                </label>
-                <Input
-                  type="number"
-                  placeholder="Kosongkan = default"
-                  value={overridePriceExtraPrint}
-                  onChange={(e) => setOverridePriceExtraPrint(e.target.value)}
-                  className="h-8 text-sm"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-zinc-500">
-                  Override Digital Copy
-                </label>
-                <Input
-                  type="number"
-                  placeholder="Kosongkan = default"
-                  value={overridePriceDigitalCopy}
-                  onChange={(e) => setOverridePriceDigitalCopy(e.target.value)}
-                  className="h-8 text-sm"
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-zinc-500">
-                  Status
-                </span>
-                <button
-                  onClick={() => setIsActive(!isActive)}
+              <button
+                onClick={() => setShowTemplateOptions(!showTemplateOptions)}
+                className="flex items-center gap-1 text-[10px] text-zinc-400 hover:text-zinc-600 transition-colors"
+              >
+                <ChevronRight
                   className={cn(
-                    "flex items-center gap-1.5 text-xs font-medium transition-colors",
-                    isActive ? "text-zinc-800" : "text-zinc-400",
+                    "size-3 transition-transform",
+                    showTemplateOptions && "rotate-90",
                   )}
-                >
-                  {isActive ? (
-                    <>
-                      <ToggleRight className="size-4" /> Aktif
-                    </>
-                  ) : (
-                    <>
-                      <ToggleLeft className="size-4" /> Nonaktif
-                    </>
-                  )}
-                </button>
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-zinc-500">Dimensi</span>
-                <span className="font-mono text-zinc-700">
-                  {canvasW}×{canvasH}px
-                </span>
-              </div>
-              {/* Overlay upload */}
-              <div className="space-y-1 pt-1 border-t border-zinc-100">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium text-zinc-500">
-                    Overlay
-                  </label>
-                  {overlayDataUrl && (
+                />
+                Opsi lainnya
+              </button>
+              {showTemplateOptions && (
+                <div className="space-y-2.5 pt-1 border-t border-zinc-100">
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-zinc-500">
+                      Override Harga Dasar
+                    </label>
+                    <Input
+                      type="number"
+                      placeholder="Kosongkan = default"
+                      value={overridePriceBase}
+                      onChange={(e) => setOverridePriceBase(e.target.value)}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-zinc-500">
+                      Override Extra Print
+                    </label>
+                    <Input
+                      type="number"
+                      placeholder="Kosongkan = default"
+                      value={overridePriceExtraPrint}
+                      onChange={(e) => setOverridePriceExtraPrint(e.target.value)}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-zinc-500">
+                      Override Digital Copy
+                    </label>
+                    <Input
+                      type="number"
+                      placeholder="Kosongkan = default"
+                      value={overridePriceDigitalCopy}
+                      onChange={(e) => setOverridePriceDigitalCopy(e.target.value)}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-zinc-500">
+                      Status
+                    </span>
                     <button
-                      onClick={() => setOverlayDataUrl(null)}
-                      className="text-[10px] text-red-400 hover:text-red-600"
+                      onClick={() => setIsActive(!isActive)}
+                      className={cn(
+                        "flex items-center gap-1.5 text-xs font-medium transition-colors",
+                        isActive ? "text-zinc-800" : "text-zinc-400",
+                      )}
                     >
-                      Hapus
+                      {isActive ? (
+                        <>
+                          <ToggleRight className="size-4" /> Aktif
+                        </>
+                      ) : (
+                        <>
+                          <ToggleLeft className="size-4" /> Nonaktif
+                        </>
+                      )}
                     </button>
-                  )}
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-zinc-500">Dimensi</span>
+                    <span className="font-mono text-zinc-700">
+                      {canvasW}×{canvasH}px
+                    </span>
+                  </div>
                 </div>
-                <button
-                  onClick={() => overlayUploadRef.current?.click()}
-                  className={cn(
-                    "w-full h-8 text-xs rounded-md border border-dashed flex items-center justify-center gap-1.5 transition-colors",
-                    overlayDataUrl
-                      ? "border-emerald-300 bg-emerald-50 text-emerald-700"
-                      : "border-zinc-300 text-zinc-400 hover:border-zinc-400 hover:text-zinc-500",
-                  )}
-                >
-                  <Upload className="size-3" />
-                  {overlayDataUrl ? "Ganti Overlay" : "Upload Overlay"}
-                </button>
-                <input
-                  ref={overlayUploadRef}
-                  type="file"
-                  accept="image/png,image/webp,image/svg+xml"
-                  className="hidden"
-                  onChange={handleOverlayUpload}
-                />
-              </div>
+              )}
             </div>
           </div>
 
@@ -740,14 +741,6 @@ export function StepEditor({
                 className="gap-1 h-8"
               >
                 <Upload className="size-3" /> Gambar
-              </Button>
-              <Button
-                size="xs"
-                variant="outline"
-                onClick={() => addElement("SHAPE")}
-                className="gap-1 h-8"
-              >
-                <Square className="size-3" /> Bentuk
               </Button>
             </div>
           </div>
@@ -1000,33 +993,6 @@ export function StepEditor({
                     <div className="grid grid-cols-2 gap-2">
                       <div className="space-y-0.5">
                         <label className="text-[10px] font-medium text-zinc-400">
-                          Font
-                        </label>
-                        <select
-                          value={
-                            (selectedEl.properties.fontFamily as string) ||
-                            "Inter"
-                          }
-                          onChange={(e) =>
-                            updateProperty(
-                              selectedEl.id,
-                              "fontFamily",
-                              e.target.value,
-                            )
-                          }
-                          className="h-7 w-full text-xs rounded-md border border-input bg-transparent px-2"
-                        >
-                          <option value="Inter">Inter</option>
-                          <option value="Arial">Arial</option>
-                          <option value="Georgia">Georgia</option>
-                          <option value="Courier New">Courier New</option>
-                          <option value="Times New Roman">
-                            Times New Roman
-                          </option>
-                        </select>
-                      </div>
-                      <div className="space-y-0.5">
-                        <label className="text-[10px] font-medium text-zinc-400">
                           Size
                         </label>
                         <Input
@@ -1042,8 +1008,6 @@ export function StepEditor({
                           className="h-7 text-xs font-mono"
                         />
                       </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
                       <div className="space-y-0.5">
                         <label className="text-[10px] font-medium text-zinc-400">
                           Weight
@@ -1065,25 +1029,6 @@ export function StepEditor({
                           <option value="400">Regular</option>
                           <option value="700">Bold</option>
                         </select>
-                      </div>
-                      <div className="space-y-0.5">
-                        <label className="text-[10px] font-medium text-zinc-400">
-                          Warna
-                        </label>
-                        <input
-                          type="color"
-                          value={
-                            (selectedEl.properties.color as string) || "#000000"
-                          }
-                          onChange={(e) =>
-                            updateProperty(
-                              selectedEl.id,
-                              "color",
-                              e.target.value,
-                            )
-                          }
-                          className="h-7 w-full rounded-md border border-input cursor-pointer"
-                        />
                       </div>
                     </div>
                     <div className="space-y-0.5">
@@ -1180,126 +1125,6 @@ export function StepEditor({
                   </>
                 )}
 
-                {/* Shape properties */}
-                {selectedEl.elementType === "SHAPE" && (
-                  <>
-                    <hr className="border-blue-100" />
-                    <div className="space-y-0.5">
-                      <label className="text-[10px] font-medium text-zinc-400">
-                        Jenis
-                      </label>
-                      <div className="flex gap-1">
-                        {(["rect", "circle"] as const).map((shape) => (
-                          <button
-                            key={shape}
-                            onClick={() =>
-                              updateProperty(selectedEl.id, "shapeType", shape)
-                            }
-                            className={cn(
-                              "flex-1 h-7 text-[10px] rounded-md border flex items-center justify-center gap-1 transition-colors",
-                              (selectedEl.properties.shapeType || "rect") ===
-                                shape
-                                ? "bg-blue-500 text-white border-blue-500"
-                                : "bg-white text-zinc-500 border-zinc-200 hover:border-zinc-300",
-                            )}
-                          >
-                            {shape === "rect" ? (
-                              <>
-                                <Square className="size-3" /> Kotak
-                              </>
-                            ) : (
-                              <>
-                                <Circle className="size-3" /> Lingkaran
-                              </>
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-0.5">
-                        <label className="text-[10px] font-medium text-zinc-400">
-                          Isi
-                        </label>
-                        <input
-                          type="color"
-                          value={
-                            (selectedEl.properties.fill as string) || "#000000"
-                          }
-                          onChange={(e) =>
-                            updateProperty(
-                              selectedEl.id,
-                              "fill",
-                              e.target.value,
-                            )
-                          }
-                          className="h-7 w-full rounded-md border border-input cursor-pointer"
-                        />
-                      </div>
-                      <div className="space-y-0.5">
-                        <label className="text-[10px] font-medium text-zinc-400">
-                          Garis
-                        </label>
-                        <input
-                          type="color"
-                          value={
-                            (selectedEl.properties.stroke as string) ||
-                            "#000000"
-                          }
-                          onChange={(e) =>
-                            updateProperty(
-                              selectedEl.id,
-                              "stroke",
-                              e.target.value,
-                            )
-                          }
-                          className="h-7 w-full rounded-md border border-input cursor-pointer"
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-0.5">
-                        <label className="text-[10px] font-medium text-zinc-400">
-                          Tebal Garis
-                        </label>
-                        <Input
-                          type="number"
-                          min={0}
-                          value={safeNum(selectedEl.properties.strokeWidth)}
-                          onChange={(e) =>
-                            updateProperty(
-                              selectedEl.id,
-                              "strokeWidth",
-                              safeNum(e.target.value),
-                            )
-                          }
-                          className="h-7 text-xs font-mono"
-                        />
-                      </div>
-                      {(selectedEl.properties.shapeType || "rect") ===
-                        "rect" && (
-                        <div className="space-y-0.5">
-                          <label className="text-[10px] font-medium text-zinc-400">
-                            Corner Radius
-                          </label>
-                          <Input
-                            type="number"
-                            min={0}
-                            value={safeNum(selectedEl.properties.cornerRadius)}
-                            onChange={(e) =>
-                              updateProperty(
-                                selectedEl.id,
-                                "cornerRadius",
-                                safeNum(e.target.value),
-                              )
-                            }
-                            className="h-7 text-xs font-mono"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
               </div>
             </div>
           )}

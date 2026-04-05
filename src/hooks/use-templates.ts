@@ -1,10 +1,16 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  keepPreviousData,
+} from "@tanstack/react-query";
 import { api, ApiError } from "@/lib/api";
-import type { ApiSuccessResponse } from "@/lib/api";
+import type { ApiSuccessResponse, ApiPaginatedResponse } from "@/lib/api";
 import type {
   Template,
   TemplateElement,
   UpdateTemplateRequest,
+  PaginationMeta,
   AssetFolder,
   AssetUploadResponse,
 } from "@/lib/types";
@@ -17,7 +23,7 @@ import type {
 
 // ── Query Keys ───────────────────────────────────────────────────────────────
 
-const TEMPLATES_KEY = ["/owner/templates"] as const;
+const TEMPLATES_KEY = "templates" as const;
 const templateKey = (id: string) => [`/owner/templates/${id}`] as const;
 const elementsKey = (templateId: string) =>
   [`/owner/templates/${templateId}/elements`] as const;
@@ -31,11 +37,25 @@ type TemplateListItem = Template & { elements?: TemplateElement[] };
 
 // ── Template List Hook ───────────────────────────────────────────────────────
 
+export interface TemplateListParams {
+  page?: number;
+  limit?: number;
+}
+
+interface TemplatePageData {
+  items: Template[];
+  meta: PaginationMeta;
+}
+
 export interface UseTemplatesReturn {
-  /** All templates owned by the current user */
+  /** Paginated templates owned by the current user */
   templates: Template[];
+  /** Pagination metadata */
+  meta: PaginationMeta | null;
   /** Whether data is loading for the first time */
   isLoading: boolean;
+  /** Whether a page transition fetch is in progress */
+  isFetching: boolean;
   /** Error from fetching */
   error: Error | null;
   /** Revalidate template list */
@@ -48,31 +68,42 @@ export interface UseTemplatesReturn {
   isMutating: boolean;
 }
 
-export function useTemplates(): UseTemplatesReturn {
+export function useTemplates(
+  params: TemplateListParams = {},
+): UseTemplatesReturn {
   const queryClient = useQueryClient();
+  const page = params.page ?? 1;
+  const limit = params.limit ?? 20;
+  const qs = `page=${page}&limit=${limit}`;
+  const queryKey = [TEMPLATES_KEY, qs] as const;
 
-  const {
-    data: rawTemplates,
-    error,
-    isLoading,
-  } = useQuery<TemplateListItem[]>({
-    queryKey: TEMPLATES_KEY,
+  const { data, error, isLoading, isFetching } = useQuery<TemplatePageData>({
+    queryKey,
+    queryFn: async (): Promise<TemplatePageData> => {
+      const res = await api.get<ApiPaginatedResponse<TemplateListItem>>(
+        `/owner/templates?${qs}`,
+      );
+
+      // Seed per-template element caches from embedded elements
+      // in the list response (eliminates N+1 queries per card).
+      const items: Template[] = res.data.map((t) => {
+        if (t.elements && t.elements.length > 0) {
+          queryClient.setQueryData<TemplateElement[]>(
+            elementsKey(t.id),
+            t.elements,
+          );
+        }
+        const { elements: _unused, ...template } = t;
+        return template;
+      });
+
+      return { items, meta: res.meta };
+    },
+    placeholderData: keepPreviousData,
     staleTime: 60_000,
   });
 
-  // Seed per-template element caches from the embedded elements
-  // in the list response (eliminates N+1 queries per card).
-  const templates: Template[] = (rawTemplates ?? []).map((t) => {
-    if (t.elements && t.elements.length > 0) {
-      queryClient.setQueryData<TemplateElement[]>(
-        elementsKey(t.id),
-        t.elements,
-      );
-    }
-    // Strip embedded elements to produce a clean Template
-    const { elements: _unused, ...template } = t;
-    return template;
-  });
+  const templates = data?.items ?? [];
 
   const updateMutation = useMutation({
     mutationFn: async ({
@@ -88,20 +119,27 @@ export function useTemplates(): UseTemplatesReturn {
       return res.data.template;
     },
     onMutate: async ({ id, data }) => {
-      await queryClient.cancelQueries({ queryKey: TEMPLATES_KEY });
-      const previous = queryClient.getQueryData<Template[]>(TEMPLATES_KEY);
-      queryClient.setQueryData<Template[]>(TEMPLATES_KEY, (old) =>
-        (old ?? []).map((t) => (t.id === id ? { ...t, ...data } : t)),
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<TemplatePageData>(queryKey);
+      queryClient.setQueryData<TemplatePageData>(queryKey, (old) =>
+        old
+          ? {
+              ...old,
+              items: old.items.map((t) =>
+                t.id === id ? { ...t, ...data } : t,
+              ),
+            }
+          : old,
       );
       return { previous };
     },
     onError: (_err, _vars, context) => {
       if (context?.previous) {
-        queryClient.setQueryData(TEMPLATES_KEY, context.previous);
+        queryClient.setQueryData(queryKey, context.previous);
       }
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: TEMPLATES_KEY });
+      queryClient.invalidateQueries({ queryKey: [TEMPLATES_KEY] });
     },
   });
 
@@ -110,20 +148,26 @@ export function useTemplates(): UseTemplatesReturn {
       await api.delete(`/owner/templates/${id}`);
     },
     onMutate: async (id) => {
-      await queryClient.cancelQueries({ queryKey: TEMPLATES_KEY });
-      const previous = queryClient.getQueryData<Template[]>(TEMPLATES_KEY);
-      queryClient.setQueryData<Template[]>(TEMPLATES_KEY, (old) =>
-        (old ?? []).filter((t) => t.id !== id),
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<TemplatePageData>(queryKey);
+      queryClient.setQueryData<TemplatePageData>(queryKey, (old) =>
+        old
+          ? {
+              ...old,
+              items: old.items.filter((t) => t.id !== id),
+              meta: { ...old.meta, total: old.meta.total - 1 },
+            }
+          : old,
       );
       return { previous };
     },
     onError: (_err, _vars, context) => {
       if (context?.previous) {
-        queryClient.setQueryData(TEMPLATES_KEY, context.previous);
+        queryClient.setQueryData(queryKey, context.previous);
       }
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: TEMPLATES_KEY });
+      queryClient.invalidateQueries({ queryKey: [TEMPLATES_KEY] });
     },
   });
 
@@ -139,10 +183,13 @@ export function useTemplates(): UseTemplatesReturn {
   };
 
   return {
-    templates: templates,
+    templates,
+    meta: data?.meta ?? null,
     isLoading,
+    isFetching,
     error: (error as Error) ?? null,
-    refresh: () => queryClient.invalidateQueries({ queryKey: TEMPLATES_KEY }),
+    refresh: () =>
+      queryClient.invalidateQueries({ queryKey: [TEMPLATES_KEY] }),
     toggleActive,
     deleteTemplate,
     isMutating: updateMutation.isPending || deleteMutation.isPending,
@@ -189,7 +236,9 @@ function extractDetailData(raw: TemplateDetailResponse | undefined): {
   const { elements: rawElements, ...template } = raw;
   return {
     template,
-    elements: [...rawElements].sort((a, b) => a.sequence - b.sequence),
+    elements: rawElements
+      ? [...rawElements].sort((a, b) => a.sequence - b.sequence)
+      : [],
   };
 }
 
@@ -212,11 +261,15 @@ export function useTemplateDetail(id: string | null): UseTemplateDetailReturn {
     staleTime: 60_000,
     // Seed from cached list data for instant rendering when navigating from list
     placeholderData: () => {
-      const listData =
-        queryClient.getQueryData<TemplateListItem[]>(TEMPLATES_KEY);
-      const match = listData?.find((t) => t.id === id);
-      if (!match?.elements) return undefined;
-      return match as TemplateDetailResponse;
+      // Search all paginated list caches for a matching template
+      const queries = queryClient.getQueriesData<TemplatePageData>({
+        queryKey: [TEMPLATES_KEY],
+      });
+      for (const [, pageData] of queries) {
+        const match = pageData?.items?.find((t) => t.id === id);
+        if (match) return match as unknown as TemplateDetailResponse;
+      }
+      return undefined;
     },
   });
 
@@ -241,7 +294,6 @@ export interface TemplateSaveData {
   width: number;
   height: number;
   backgroundUrl: string;
-  overlayUrl?: string | null;
   overridePriceBase?: number | null;
   overridePriceExtraPrint?: number | null;
   overridePriceDigitalCopy?: number | null;
@@ -276,7 +328,6 @@ export async function createTemplateWithElements(
       width: data.width,
       height: data.height,
       backgroundUrl: data.backgroundUrl,
-      overlayUrl: data.overlayUrl ?? null,
       overridePriceBase: data.overridePriceBase ?? null,
       overridePriceExtraPrint: data.overridePriceExtraPrint ?? null,
       overridePriceDigitalCopy: data.overridePriceDigitalCopy ?? null,
@@ -341,7 +392,6 @@ export async function updateTemplateWithElements(
     width: data.width,
     height: data.height,
     backgroundUrl: data.backgroundUrl,
-    overlayUrl: data.overlayUrl ?? null,
     overridePriceBase: data.overridePriceBase ?? null,
     overridePriceExtraPrint: data.overridePriceExtraPrint ?? null,
     overridePriceDigitalCopy: data.overridePriceDigitalCopy ?? null,
@@ -441,7 +491,7 @@ function dataUrlToBlob(dataUrl: string): Blob {
 /**
  * Upload an asset to Supabase Storage via the backend API.
  * @param file - File or Blob to upload
- * @param folder - Asset folder: backgrounds, overlays, or elements
+ * @param folder - Asset folder: backgrounds or elements
  * @returns The public URL of the uploaded asset
  */
 export async function uploadAsset(

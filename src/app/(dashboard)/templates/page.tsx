@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
   useTemplates,
   useTemplateElements,
@@ -22,6 +22,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
+  ChevronLeft,
+  ChevronRight,
   Layers,
   Pencil,
   Plus,
@@ -76,7 +78,6 @@ function TemplateCard({
         canvasWidth={template.width}
         canvasHeight={template.height}
         backgroundUrl={template.backgroundUrl}
-        overlayUrl={template.overlayUrl}
         elements={elements}
         isLoading={elementsLoading}
         inactive={!template.isActive}
@@ -192,14 +193,27 @@ function TemplateCardSkeleton() {
 }
 
 // ── Page ───────────────────────────────────────────────────────────────────────
+const DEFAULT_LIMIT = 20;
+
 export default function TemplatesPage() {
   const router = useRouter();
-  const { templates, isLoading, error, toggleActive, deleteTemplate } =
-    useTemplates();
+  const [page, setPage] = useState(1);
+  const {
+    templates,
+    meta,
+    isLoading,
+    isFetching,
+    error,
+    toggleActive,
+    deleteTemplate,
+  } = useTemplates({ page, limit: DEFAULT_LIMIT });
 
   const [deleteTarget, setDeleteTarget] = useState<Template | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+
+  const totalPages = meta ? Math.ceil(meta.total / meta.limit) : 0;
+  const goToPage = useCallback((p: number) => setPage(p), []);
 
   const handleToggleActive = async (id: string, currentActive: boolean) => {
     setTogglingId(id);
@@ -240,7 +254,13 @@ export default function TemplatesPage() {
     }
   };
 
-  const activeCount = templates.filter((t) => t.isActive).length;
+  const handleDeleteConfirmAndReset = async () => {
+    await handleDeleteConfirm();
+    // If current page becomes empty after delete, go back
+    if (templates.length <= 1 && page > 1) {
+      setPage(page - 1);
+    }
+  };
 
   if (error) {
     return (
@@ -264,9 +284,9 @@ export default function TemplatesPage() {
           </h1>
           <p className="text-sm text-zinc-500">
             Buat dan kelola template cetak untuk semua kiosk kamu.{" "}
-            {!isLoading && (
+            {!isLoading && meta && (
               <span className="text-zinc-400">
-                {activeCount} aktif · {templates.length - activeCount} nonaktif
+                {meta.total} template
               </span>
             )}
           </p>
@@ -306,7 +326,12 @@ export default function TemplatesPage() {
           </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div
+          className={cn(
+            "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 transition-opacity duration-200",
+            isFetching && "opacity-50 pointer-events-none",
+          )}
+        >
           {templates.map((tpl) => (
             <TemplateCard
               key={tpl.id}
@@ -319,6 +344,57 @@ export default function TemplatesPage() {
               isTogglingId={togglingId}
             />
           ))}
+        </div>
+      )}
+
+      {/* ── Pagination ── */}
+      {meta && totalPages > 1 && (
+        <div className="flex items-center justify-between pt-2">
+          <p className="text-xs text-zinc-400">
+            Hal. {page} dari {totalPages}
+            <span className="hidden sm:inline"> · {meta.total} template</span>
+          </p>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => goToPage(page - 1)}
+              disabled={page <= 1}
+              className="h-7 w-7 p-0"
+            >
+              <ChevronLeft className="size-3.5" />
+            </Button>
+            {(() => {
+              const pages: number[] = [];
+              let start = Math.max(1, page - 2);
+              const end = Math.min(totalPages, start + 4);
+              start = Math.max(1, end - 4);
+              for (let i = start; i <= end; i++) pages.push(i);
+              return pages.map((p) => (
+                <Button
+                  key={p}
+                  variant={p === page ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => goToPage(p)}
+                  className={cn(
+                    "h-7 w-7 p-0 text-xs",
+                    p === page && "bg-zinc-950 text-white hover:bg-zinc-800",
+                  )}
+                >
+                  {p}
+                </Button>
+              ));
+            })()}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => goToPage(page + 1)}
+              disabled={page >= totalPages}
+              className="h-7 w-7 p-0"
+            >
+              <ChevronRight className="size-3.5" />
+            </Button>
+          </div>
         </div>
       )}
 
@@ -356,7 +432,7 @@ export default function TemplatesPage() {
             <Button
               variant="destructive"
               size="sm"
-              onClick={handleDeleteConfirm}
+              onClick={handleDeleteConfirmAndReset}
               disabled={isDeleting}
               className="gap-1.5"
             >

@@ -22,8 +22,6 @@ interface TemplatePreviewProps {
   canvasHeight: number;
   /** Background image URL */
   backgroundUrl?: string;
-  /** Overlay image URL */
-  overlayUrl?: string | null;
   /** Elements as saved in the editor */
   elements: TemplateElement[];
   /** Whether elements are still loading */
@@ -38,7 +36,6 @@ export default function TemplatePreview({
   canvasWidth,
   canvasHeight,
   backgroundUrl,
-  overlayUrl,
   elements,
   isLoading = false,
   inactive = false,
@@ -106,17 +103,6 @@ export default function TemplatePreview({
             />
           ))}
 
-        {/* Overlay image (on top of elements) */}
-        {overlayUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={overlayUrl}
-            alt=""
-            draggable={false}
-            className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none"
-            style={{ zIndex: 50 }}
-          />
-        )}
       </div>
 
       {/* Inactive overlay — on outer container to cover full area */}
@@ -221,7 +207,7 @@ function ElementPreview({
       <div
         style={{
           ...style,
-          fontFamily: props.fontFamily || "Inter, sans-serif",
+          fontFamily: props.fontFamily || "'Courier New', monospace",
           // Use cqi (container query inline) for responsive font sizing.
           // Fallback: percentage of container width via vw approximation.
           fontSize: `${scaledFontSize}cqi`,
@@ -270,37 +256,6 @@ function ElementPreview({
           objectFit: "cover",
         }}
         className="select-none pointer-events-none"
-      />
-    );
-  }
-
-  // ── shape ───────────────────────────────────────────────────────────────
-  if (el.elementType === "SHAPE") {
-    const props = el.properties as {
-      fill?: string;
-      stroke?: string;
-      strokeWidth?: number;
-      cornerRadius?: number;
-      shapeType?: "rect" | "circle";
-    };
-
-    const isCircle = props.shapeType === "circle";
-    const borderRadius = isCircle
-      ? "50%"
-      : props.cornerRadius
-        ? `${toPercent(props.cornerRadius, canvasWidth)}%`
-        : undefined;
-
-    return (
-      <div
-        style={{
-          ...style,
-          backgroundColor: props.fill || "rgba(0,0,0,0.1)",
-          border: props.stroke
-            ? `${props.strokeWidth || 1}px solid ${props.stroke}`
-            : undefined,
-          borderRadius,
-        }}
       />
     );
   }

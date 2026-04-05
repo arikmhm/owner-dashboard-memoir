@@ -20,8 +20,8 @@ export type MutationCategory =
   | "WITHDRAWAL"
   | "ADJUSTMENT";
 export type WithdrawalStatus = "PENDING" | "PROCESSED" | "REJECTED";
-export type ElementType = "PHOTO_SLOT" | "IMAGE" | "TEXT" | "SHAPE";
-export type AssetFolder = "backgrounds" | "overlays" | "elements";
+export type ElementType = "PHOTO_SLOT" | "IMAGE" | "TEXT";
+export type AssetFolder = "backgrounds" | "elements";
 
 // ── Dashboard ────────────────────────────────────────────────────────────────
 
@@ -238,7 +238,6 @@ export interface Template {
   width: number;
   height: number;
   backgroundUrl: string;
-  overlayUrl: string | null;
   overridePriceBase: number | null;
   overridePriceExtraPrint: number | null;
   overridePriceDigitalCopy: number | null;
@@ -269,10 +268,9 @@ export interface TemplateWithElements {
 
 export interface CreateTemplateRequest {
   name: string;
-  width: number;
+  width?: number;
   height: number;
   backgroundUrl: string;
-  overlayUrl?: string | null;
   overridePriceBase?: number | null;
   overridePriceExtraPrint?: number | null;
   overridePriceDigitalCopy?: number | null;
@@ -284,7 +282,6 @@ export interface UpdateTemplateRequest {
   width?: number;
   height?: number;
   backgroundUrl?: string;
-  overlayUrl?: string | null;
   overridePriceBase?: number | null;
   overridePriceExtraPrint?: number | null;
   overridePriceDigitalCopy?: number | null;

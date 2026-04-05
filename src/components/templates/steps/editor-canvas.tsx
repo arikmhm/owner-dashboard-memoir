@@ -17,7 +17,7 @@ import {
 } from "@/lib/template-variables";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
-export type ElementType = "PHOTO_SLOT" | "IMAGE" | "TEXT" | "SHAPE";
+export type ElementType = "PHOTO_SLOT" | "IMAGE" | "TEXT";
 
 export interface TemplateElement {
   id: string;
@@ -366,7 +366,7 @@ export default function EditorCanvas({
                       )
                     : props.content || "Teks baru"
                 }
-                fontFamily={props.fontFamily || "Inter"}
+                fontFamily={props.fontFamily || "Courier New"}
                 fontSize={props.fontSize || 24}
                 fontStyle={props.fontWeight === "700" ? "bold" : "normal"}
                 fill={props.color || "#000000"}
@@ -399,70 +399,6 @@ export default function EditorCanvas({
                 opacity={el.opacity / 100}
                 stroke={isSelected ? "#8b5cf6" : undefined}
                 strokeWidth={isSelected ? 2 : 0}
-                draggable={!previewMode}
-                onClick={() => onSelect(el.id)}
-                onTap={() => onSelect(el.id)}
-                onDragMove={(e) => handleDragMove(el.id, e)}
-                onDragEnd={(e) => handleDragEnd(el.id, e)}
-                onTransformEnd={(e) => handleTransformEnd(el.id, e)}
-              />
-            );
-          }
-
-          if (el.elementType === "SHAPE") {
-            const shapeProps = el.properties as {
-              fill?: string;
-              stroke?: string;
-              strokeWidth?: number;
-              cornerRadius?: number;
-              shapeType?: "rect" | "circle";
-            };
-            const shapeType = shapeProps.shapeType || "rect";
-
-            if (shapeType === "circle") {
-              const radius = Math.min(el.width, el.height) / 2;
-              return (
-                <Rect
-                  key={el.id}
-                  id={el.id}
-                  x={el.x}
-                  y={el.y}
-                  width={el.width}
-                  height={el.height}
-                  rotation={el.rotation}
-                  opacity={el.opacity / 100}
-                  fill={shapeProps.fill || "rgba(0,0,0,0.1)"}
-                  stroke={
-                    isSelected ? "#8b5cf6" : shapeProps.stroke || "transparent"
-                  }
-                  strokeWidth={isSelected ? 2 : shapeProps.strokeWidth || 0}
-                  cornerRadius={radius}
-                  draggable={!previewMode}
-                  onClick={() => onSelect(el.id)}
-                  onTap={() => onSelect(el.id)}
-                  onDragMove={(e) => handleDragMove(el.id, e)}
-                  onDragEnd={(e) => handleDragEnd(el.id, e)}
-                  onTransformEnd={(e) => handleTransformEnd(el.id, e)}
-                />
-              );
-            }
-
-            return (
-              <Rect
-                key={el.id}
-                id={el.id}
-                x={el.x}
-                y={el.y}
-                width={el.width}
-                height={el.height}
-                rotation={el.rotation}
-                opacity={el.opacity / 100}
-                fill={shapeProps.fill || "rgba(0,0,0,0.1)"}
-                stroke={
-                  isSelected ? "#8b5cf6" : shapeProps.stroke || "transparent"
-                }
-                strokeWidth={isSelected ? 2 : shapeProps.strokeWidth || 0}
-                cornerRadius={shapeProps.cornerRadius || 0}
                 draggable={!previewMode}
                 onClick={() => onSelect(el.id)}
                 onTap={() => onSelect(el.id)}
