@@ -57,6 +57,8 @@ export interface UseWalletReturn {
   meta: PaginationMeta | null;
   /** Whether data is loading */
   isLoading: boolean;
+  /** Whether data is being refetched in background */
+  isRefetching: boolean;
   /** Error from fetch */
   error: Error | null;
   /** Revalidate wallet data */
@@ -67,7 +69,7 @@ export function useWallet(page = 1, limit = 20): UseWalletReturn {
   const queryClient = useQueryClient();
   const endpoint = `/owner/wallet?page=${page}&limit=${limit}`;
 
-  const { data, error, isLoading } = useQuery<WalletPageData>({
+  const { data, error, isLoading, isRefetching } = useQuery<WalletPageData>({
     queryKey: ["wallet", page, limit],
     queryFn: async (): Promise<WalletPageData> => {
       const res = await api.get<WalletApiResponse>(endpoint);
@@ -86,6 +88,7 @@ export function useWallet(page = 1, limit = 20): UseWalletReturn {
     mutations: data?.mutations ?? [],
     meta: data?.meta ?? null,
     isLoading,
+    isRefetching,
     error: (error as Error) ?? null,
     refresh: () => queryClient.invalidateQueries({ queryKey: ["wallet"] }),
   };
@@ -100,6 +103,8 @@ export interface UseWithdrawalsReturn {
   meta: PaginationMeta | null;
   /** Whether data is loading */
   isLoading: boolean;
+  /** Whether data is being refetched in background */
+  isRefetching: boolean;
   /** Error from fetch */
   error: Error | null;
   /** Whether there's a PENDING withdrawal */
@@ -120,7 +125,7 @@ export function useWithdrawals(page = 1, limit = 20): UseWithdrawalsReturn {
   const queryClient = useQueryClient();
   const endpoint = `/owner/withdrawals?page=${page}&limit=${limit}`;
 
-  const { data, error, isLoading } = useQuery<WithdrawalPageData>({
+  const { data, error, isLoading, isRefetching } = useQuery<WithdrawalPageData>({
     queryKey: ["withdrawals", page, limit],
     queryFn: async (): Promise<WithdrawalPageData> => {
       const res = await api.get<WithdrawalApiResponse>(endpoint);
@@ -156,6 +161,7 @@ export function useWithdrawals(page = 1, limit = 20): UseWithdrawalsReturn {
     withdrawals: data?.items ?? [],
     meta: data?.meta ?? null,
     isLoading,
+    isRefetching,
     error: (error as Error) ?? null,
     hasPending,
     refresh: () => queryClient.invalidateQueries({ queryKey: ["withdrawals"] }),

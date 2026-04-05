@@ -64,7 +64,7 @@ export default function TransactionsPage() {
   const [expandedTxId, setExpandedTxId] = useState<string | null>(null);
 
   // ── Data fetching ────────────────────────────────────────────────────────
-  const { transactions, meta, isLoading, error, refresh } =
+  const { transactions, meta, isLoading, isRefetching, error, refresh } =
     useTransactions(filters);
   const { kiosks } = useKiosks();
   const { templates } = useTemplates();
@@ -207,9 +207,10 @@ export default function TransactionsPage() {
             variant="outline"
             size="sm"
             onClick={refresh}
+            disabled={isRefetching}
             className="h-8 text-xs gap-1.5"
           >
-            <RefreshCw className={cn("size-3", isLoading && "animate-spin")} />
+            <RefreshCw className={cn("size-3", isRefetching && "animate-spin")} />
           </Button>
 
           {/* Clear all */}

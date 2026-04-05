@@ -13,6 +13,8 @@ interface UseDashboardReturn {
   summary: DashboardSummary | null;
   /** Whether data is still loading */
   isLoading: boolean;
+  /** Whether data is being refetched in background */
+  isRefetching: boolean;
   /** Error from fetch */
   error: Error | null;
   /** Revalidate dashboard data */
@@ -22,7 +24,7 @@ interface UseDashboardReturn {
 export function useDashboard(): UseDashboardReturn {
   const queryClient = useQueryClient();
 
-  const { data, isLoading, error } = useQuery<DashboardSummary>({
+  const { data, isLoading, isRefetching, error } = useQuery<DashboardSummary>({
     queryKey: ["/owner/dashboard"],
     queryFn: async () => {
       const res = await api.get<ApiSuccessResponse<DashboardSummary>>(
@@ -36,6 +38,7 @@ export function useDashboard(): UseDashboardReturn {
   return {
     summary: data ?? null,
     isLoading,
+    isRefetching,
     error: (error as Error) ?? null,
     refresh: () =>
       queryClient.invalidateQueries({ queryKey: ["/owner/dashboard"] }),

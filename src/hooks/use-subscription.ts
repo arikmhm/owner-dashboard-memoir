@@ -72,6 +72,8 @@ export interface UseInvoicesReturn {
   meta: PaginationMeta | null;
   /** Whether data is loading */
   isLoading: boolean;
+  /** Whether data is being refetched in background */
+  isRefetching: boolean;
   /** Error from fetch */
   error: Error | null;
   /** Revalidate list */
@@ -82,7 +84,7 @@ export function useInvoices(page = 1, limit = 20): UseInvoicesReturn {
   const queryClient = useQueryClient();
   const endpoint = `/owner/subscription/invoices?page=${page}&limit=${limit}`;
 
-  const { data, error, isLoading } = useQuery<InvoicePageData>({
+  const { data, error, isLoading, isRefetching } = useQuery<InvoicePageData>({
     queryKey: ["invoices", page, limit],
     queryFn: async (): Promise<InvoicePageData> => {
       const res =
@@ -100,6 +102,7 @@ export function useInvoices(page = 1, limit = 20): UseInvoicesReturn {
     invoices: data?.items ?? [],
     meta: data?.meta ?? null,
     isLoading,
+    isRefetching,
     error: (error as Error) ?? null,
     refresh: () => queryClient.invalidateQueries({ queryKey: ["invoices"] }),
   };

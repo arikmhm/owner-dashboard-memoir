@@ -84,6 +84,7 @@ export default function WalletPage() {
     mutations,
     meta: mutationMeta,
     isLoading: walletLoading,
+    isRefetching: walletRefetching,
     error: walletError,
     refresh: refreshWallet,
   } = useWallet(mutationPage, MUTATION_LIMIT);
@@ -92,6 +93,7 @@ export default function WalletPage() {
     withdrawals,
     meta: withdrawalMeta,
     isLoading: withdrawalLoading,
+    isRefetching: withdrawalRefetching,
     error: withdrawalError,
     hasPending,
     refresh: refreshWithdrawals,
@@ -195,12 +197,13 @@ export default function WalletPage() {
           variant="outline"
           size="sm"
           onClick={handleRefreshAll}
+          disabled={walletRefetching || withdrawalRefetching}
           className="h-8 text-xs gap-1.5 shrink-0"
         >
           <RefreshCw
             className={cn(
               "size-3",
-              (walletLoading || withdrawalLoading) && "animate-spin",
+              (walletRefetching || withdrawalRefetching) && "animate-spin",
             )}
           />
           Refresh

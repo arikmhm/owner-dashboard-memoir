@@ -8,7 +8,7 @@
 // Best practices: client-swr-dedup, rerender-functional-setstate
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo } from "react";
 import {
   ArrowUpCircle,
   ChevronLeft,
@@ -17,8 +17,6 @@ import {
   Loader2,
   CreditCard,
   AlertCircle,
-  Clock,
-  Timer,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -48,12 +46,9 @@ import {
   checkPaymentStatus,
 } from "@/hooks/use-subscription";
 import { ApiError } from "@/lib/api";
-import { useCountdown } from "@/hooks/use-countdown";
 import { toast } from "sonner";
 import type {
   BillingPeriod,
-  Subscription,
-  SubscriptionInvoice,
   SubscriptionPlan,
 } from "@/lib/types";
 
@@ -79,6 +74,7 @@ export default function SubscriptionPage() {
     invoices,
     meta: invoiceMeta,
     isLoading: invoicesLoading,
+    isRefetching: invoicesRefetching,
     error: invoicesError,
     refresh: refreshInvoices,
   } = useInvoices(invoicePage, INVOICE_LIMIT);
@@ -106,21 +102,6 @@ export default function SubscriptionPage() {
     return plans.find((p) => p.id === subscription.planId) ?? null;
   }, [subscription, plans]);
 
-  const pendingUpgradePlan = useMemo(() => {
-    if (!pendingUpgrade || !plans.length) return null;
-    return plans.find((p) => p.id === pendingUpgrade.planId) ?? null;
-  }, [pendingUpgrade, plans]);
-
-  // Find latest PENDING invoice for the pending upgrade subscription
-  const pendingUpgradeInvoice = useMemo(() => {
-    if (!pendingUpgrade || !invoices.length) return null;
-    return (
-      invoices.find(
-        (inv) =>
-          inv.subscriptionId === pendingUpgrade.id && inv.status === "PENDING",
-      ) ?? null
-    );
-  }, [pendingUpgrade, invoices]);
 
   const statusConfig = subscriptionStatus
     ? SUBSCRIPTION_STATUS_CONFIG[subscriptionStatus]
@@ -207,6 +188,8 @@ export default function SubscriptionPage() {
     refreshInvoices();
   }, [refreshSubscription, refreshInvoices]);
 
+
+
   // ── Render ─────────────────────────────────────────────────────────────
   return (
     <div className="space-y-8">
@@ -224,10 +207,11 @@ export default function SubscriptionPage() {
           variant="outline"
           size="sm"
           onClick={handleRefreshAll}
+          disabled={invoicesRefetching}
           className="h-8 text-xs gap-1.5 shrink-0"
         >
           <RefreshCw
-            className={cn("size-3", invoicesLoading && "animate-spin")}
+            className={cn("size-3", invoicesRefetching && "animate-spin")}
           />
           Refresh
         </Button>
@@ -338,17 +322,6 @@ export default function SubscriptionPage() {
           )}
         </div>
       </div>
-
-      {/* Pending Upgrade Banner */}
-      {pendingUpgrade && (
-        <PendingUpgradeBanner
-          pendingUpgrade={pendingUpgrade}
-          pendingUpgradePlan={pendingUpgradePlan}
-          pendingUpgradeInvoice={pendingUpgradeInvoice}
-          checkingInvoiceId={checkingInvoiceId}
-          onCheckPayment={handleCheckPayment}
-        />
-      )}
 
       {/* Plan Features Summary */}
       {activePlan && (
@@ -638,14 +611,13 @@ export default function SubscriptionPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 py-2">
-              {plans.map((plan, i) => {
+              {plans.map((plan) => {
                 const price =
                   billingPeriod === "MONTHLY"
                     ? plan.priceMonthly
                     : plan.priceYearly;
                 const priceLabel =
                   billingPeriod === "MONTHLY" ? "/bln" : "/thn";
-                const isHighlighted = i === 1;
                 const isCurrentPlan = subscription?.planId === plan.id;
                 const isCurrentlySubmitting =
                   isSubmitting && selectedPlanId === plan.id;
@@ -655,57 +627,35 @@ export default function SubscriptionPage() {
                     key={plan.id}
                     className={cn(
                       "border rounded-xl p-5 space-y-4 transition relative",
-                      isHighlighted
-                        ? "border-zinc-950 bg-zinc-950 text-white"
-                        : "border-zinc-200 bg-white text-zinc-950 hover:border-zinc-400",
+                      isCurrentPlan
+                        ? "border-zinc-950 bg-zinc-50"
+                        : "border-zinc-200 bg-white hover:border-zinc-400",
                     )}
                   >
                     {isCurrentPlan && (
                       <div className="absolute -top-2.5 left-4">
-                        <Badge className="text-[9px] bg-emerald-500 text-white hover:bg-emerald-500">
+                        <Badge className="text-[9px] bg-zinc-950 text-white hover:bg-zinc-950">
                           Plan Aktif
                         </Badge>
                       </div>
                     )}
 
                     <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-400">
-                          {plan.name}
-                        </p>
-                        {isHighlighted && (
-                          <Badge className="text-[9px] bg-white text-zinc-950 hover:bg-white">
-                            Populer
-                          </Badge>
-                        )}
-                      </div>
-                      <p
-                        className={cn(
-                          "text-xl font-semibold",
-                          isHighlighted ? "text-white" : "text-zinc-950",
-                        )}
-                      >
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-400">
+                        {plan.name}
+                      </p>
+                      <p className="text-xl font-semibold text-zinc-950">
                         {formatRupiah(price)}
                         <span className="text-xs font-normal text-zinc-400">
                           {priceLabel}
                         </span>
                       </p>
-                      <p
-                        className={cn(
-                          "text-[11px]",
-                          isHighlighted ? "text-zinc-400" : "text-zinc-500",
-                        )}
-                      >
+                      <p className="text-[11px] text-zinc-500">
                         {plan.description}
                       </p>
                     </div>
 
-                    <div
-                      className={cn(
-                        "text-[11px] space-y-0.5",
-                        isHighlighted ? "text-zinc-300" : "text-zinc-500",
-                      )}
-                    >
+                    <div className="text-[11px] space-y-0.5 text-zinc-500">
                       <p>✓ Maks. {plan.maxKiosks} kiosk aktif</p>
                       <p>✓ Template tidak terbatas</p>
                       <p>✓ Semua metode pembayaran</p>
@@ -714,12 +664,7 @@ export default function SubscriptionPage() {
                     <Button
                       onClick={() => handleUpgrade(plan)}
                       disabled={isSubmitting || isCurrentPlan}
-                      className={cn(
-                        "w-full text-xs",
-                        isHighlighted
-                          ? "bg-white text-zinc-950 hover:bg-zinc-100"
-                          : "bg-zinc-950 text-white hover:bg-zinc-800",
-                      )}
+                      className="w-full text-xs bg-zinc-950 text-white hover:bg-zinc-800"
                       size="sm"
                     >
                       {isCurrentlySubmitting ? (
@@ -754,133 +699,3 @@ export default function SubscriptionPage() {
   );
 }
 
-// ── Pending Upgrade Banner (extracted for useCountdown) ───────────────────
-
-function PendingUpgradeBanner({
-  pendingUpgrade,
-  pendingUpgradePlan,
-  pendingUpgradeInvoice,
-  checkingInvoiceId,
-  onCheckPayment,
-}: {
-  pendingUpgrade: Subscription;
-  pendingUpgradePlan: SubscriptionPlan | null;
-  pendingUpgradeInvoice: SubscriptionInvoice | null;
-  checkingInvoiceId: string | null;
-  onCheckPayment: (invoiceId: string) => void;
-}) {
-  const { refreshSubscription } = useAuth();
-  const { display: countdown, isExpired } = useCountdown(
-    pendingUpgradeInvoice?.paymentExpiresAt ?? null,
-  );
-
-  // Auto-poll payment status every 5 seconds
-  useEffect(() => {
-    if (!pendingUpgradeInvoice || isExpired) return;
-
-    const interval = setInterval(async () => {
-      try {
-        const result = await checkPaymentStatus(pendingUpgradeInvoice.id);
-
-        if (result.status === "PAID") {
-          toast.success("Pembayaran berhasil! Subscription aktif.");
-          await refreshSubscription();
-        } else if (
-          result.status === "FAILED" ||
-          result.status === "EXPIRED"
-        ) {
-          toast.error("Pembayaran gagal atau kadaluarsa.");
-        }
-
-        if (result.status !== "PENDING") {
-          clearInterval(interval);
-        }
-      } catch {
-        // Silent fail — manual button still available
-      }
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [pendingUpgradeInvoice, isExpired, refreshSubscription]);
-
-  return (
-    <div className="border border-yellow-200 rounded-xl bg-yellow-50 overflow-hidden">
-      <div className="px-6 py-4 space-y-3">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <Clock className="size-4 text-yellow-600 shrink-0" />
-            <div className="space-y-0.5">
-              <p className="text-sm font-medium text-yellow-800">
-                Upgrade ke{" "}
-                {pendingUpgradePlan?.name ?? pendingUpgrade.planId} menunggu
-                pembayaran
-              </p>
-              <p className="text-xs text-yellow-600">
-                {BILLING_PERIOD_LABEL[pendingUpgrade.billingPeriod]} ·{" "}
-                {formatRupiah(pendingUpgrade.pricePaid)}/periode — Plan aktif
-                saat ini tetap berjalan.
-              </p>
-            </div>
-          </div>
-          <Badge className="text-[10px] shrink-0 bg-yellow-100 text-yellow-700">
-            Menunggu Pembayaran
-          </Badge>
-        </div>
-
-        {/* QRIS QR Code for pending upgrade */}
-        {pendingUpgradeInvoice?.qrString && !isExpired && (
-          <div className="flex items-start gap-4 pt-1">
-            <div className="rounded-lg border border-yellow-300 bg-white p-2">
-              <QRCodeSVG
-                value={pendingUpgradeInvoice.qrString}
-                size={120}
-                level="M"
-              />
-            </div>
-            <div className="text-xs text-yellow-700 space-y-1">
-              <p>
-                Scan QR code untuk membayar via e-wallet atau mobile banking.
-              </p>
-              {pendingUpgradeInvoice.paymentExpiresAt && (
-                <div className="flex items-center gap-1.5 text-yellow-600">
-                  <Timer className="size-3" />
-                  <span className="font-mono font-medium tabular-nums">
-                    {countdown}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* QR expired */}
-        {isExpired && (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 flex items-center gap-2">
-            <AlertCircle className="size-3.5 shrink-0" />
-            QR code sudah kadaluarsa. Refresh halaman atau buat subscription
-            baru.
-          </div>
-        )}
-
-        {pendingUpgradeInvoice && !isExpired && (
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-xs gap-1.5 border-yellow-300 text-yellow-800 hover:bg-yellow-100"
-              onClick={() => onCheckPayment(pendingUpgradeInvoice.id)}
-              disabled={checkingInvoiceId === pendingUpgradeInvoice.id}
-            >
-              {checkingInvoiceId === pendingUpgradeInvoice.id ? (
-                <Loader2 className="size-3 animate-spin" />
-              ) : (
-                <RefreshCw className="size-3" />
-              )}
-              Cek Status
-            </Button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}

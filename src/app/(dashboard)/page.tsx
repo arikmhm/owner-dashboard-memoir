@@ -9,6 +9,7 @@
 import { useAuth } from "@/components/auth-provider";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { formatRupiah } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -211,7 +212,7 @@ function StatCardSkeleton() {
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const { summary, isLoading, error, refresh } = useDashboard();
+  const { summary, isLoading, isRefetching, error, refresh } = useDashboard();
 
   // Display name: derive from user email or fallback
   const displayName = user?.email?.split("@")[0] || "Owner";
@@ -286,10 +287,11 @@ export default function DashboardPage() {
           variant="ghost"
           size="sm"
           onClick={refresh}
+          disabled={isRefetching}
           className="gap-1.5 text-zinc-400 hover:text-zinc-700"
           aria-label="Refresh data dashboard"
         >
-          <RefreshCw className="h-3.5 w-3.5" />
+          <RefreshCw className={cn("h-3.5 w-3.5", isRefetching && "animate-spin")} />
           <span className="hidden text-xs sm:inline">Refresh</span>
         </Button>
       </div>

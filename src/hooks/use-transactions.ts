@@ -64,6 +64,8 @@ export interface UseTransactionsReturn {
   meta: PaginationMeta | null;
   /** Whether data is loading */
   isLoading: boolean;
+  /** Whether data is being refetched in background */
+  isRefetching: boolean;
   /** Error from fetch */
   error: Error | null;
   /** Revalidate list */
@@ -77,7 +79,7 @@ export function useTransactions(
   const qs = buildQueryString(filters);
   const endpoint = `/owner/transactions?${qs}`;
 
-  const { data, error, isLoading } = useQuery<TransactionPageData>({
+  const { data, error, isLoading, isRefetching } = useQuery<TransactionPageData>({
     queryKey: ["transactions", qs],
     queryFn: async (): Promise<TransactionPageData> => {
       const res = await api.get<ApiPaginatedResponse<Transaction>>(endpoint);
@@ -94,6 +96,7 @@ export function useTransactions(
     transactions: data?.items ?? [],
     meta: data?.meta ?? null,
     isLoading,
+    isRefetching,
     error: (error as Error) ?? null,
     refresh: () =>
       queryClient.invalidateQueries({ queryKey: ["transactions", qs] }),
