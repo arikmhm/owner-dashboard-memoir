@@ -150,18 +150,10 @@ export default function TransactionsPage() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="space-y-1 pb-5 border-b border-zinc-100">
+      <div className="pb-5 border-b border-zinc-200">
         <h1 className="text-2xl font-semibold text-zinc-950 tracking-tight">
-          Transaksi &amp; Laporan
+          Transaksi
         </h1>
-        <p className="text-sm text-zinc-500">
-          Pantau semua transaksi dari seluruh kiosk kamu.
-          {meta && !isLoading && (
-            <span className="text-zinc-400 ml-1">
-              {meta.total} transaksi ditemukan
-            </span>
-          )}
-        </p>
       </div>
 
       {/* Search & Filter Bar */}
@@ -228,10 +220,10 @@ export default function TransactionsPage() {
 
         {/* Filter panel */}
         {showFilters && (
-          <div className="flex flex-wrap items-center gap-3 p-3 rounded-lg border border-zinc-200 bg-zinc-50/50">
+          <div className="flex flex-wrap items-end gap-x-5 gap-y-4 p-4 rounded-sm border border-zinc-200 bg-zinc-50/50">
             {/* Kiosk filter */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
+            <div className="flex flex-col gap-1.5">
+              <label className="block text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
                 Kiosk
               </label>
               <select
@@ -239,7 +231,7 @@ export default function TransactionsPage() {
                 onChange={(e) =>
                   updateFilter("kioskId", e.target.value || undefined)
                 }
-                className="h-7 text-xs rounded-md border border-zinc-200 bg-white px-2 pr-6 text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-300"
+                className="block h-8 text-xs rounded-sm border border-zinc-200 bg-white px-2.5 pr-7 text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-300"
               >
                 <option value="">Semua Kiosk</option>
                 {kiosks.map((k) => (
@@ -251,8 +243,8 @@ export default function TransactionsPage() {
             </div>
 
             {/* Status filter */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
+            <div className="flex flex-col gap-1.5">
+              <label className="block text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
                 Status
               </label>
               <select
@@ -263,7 +255,7 @@ export default function TransactionsPage() {
                     (e.target.value as TxStatus) || undefined,
                   )
                 }
-                className="h-7 text-xs rounded-md border border-zinc-200 bg-white px-2 pr-6 text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-300"
+                className="block h-8 text-xs rounded-sm border border-zinc-200 bg-white px-2.5 pr-7 text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-300"
               >
                 <option value="">Semua Status</option>
                 {STATUS_OPTIONS.map((s) => (
@@ -275,8 +267,8 @@ export default function TransactionsPage() {
             </div>
 
             {/* Payment method filter */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
+            <div className="flex flex-col gap-1.5">
+              <label className="block text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
                 Metode
               </label>
               <select
@@ -287,7 +279,7 @@ export default function TransactionsPage() {
                     (e.target.value as PaymentMethod) || undefined,
                   )
                 }
-                className="h-7 text-xs rounded-md border border-zinc-200 bg-white px-2 pr-6 text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-300"
+                className="block h-8 text-xs rounded-sm border border-zinc-200 bg-white px-2.5 pr-7 text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-300"
               >
                 <option value="">Semua Metode</option>
                 {PAYMENT_OPTIONS.map((p) => (
@@ -299,8 +291,8 @@ export default function TransactionsPage() {
             </div>
 
             {/* Date range */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
+            <div className="flex flex-col gap-1.5">
+              <label className="block text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
                 Dari
               </label>
               <input
@@ -309,11 +301,11 @@ export default function TransactionsPage() {
                 onChange={(e) =>
                   updateFilter("startDate", e.target.value || undefined)
                 }
-                className="h-7 text-xs rounded-md border border-zinc-200 bg-white px-2 text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-300"
+                className="block h-8 text-xs rounded-sm border border-zinc-200 bg-white px-2.5 text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-300"
               />
             </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
+            <div className="flex flex-col gap-1.5">
+              <label className="block text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
                 Sampai
               </label>
               <input
@@ -322,7 +314,7 @@ export default function TransactionsPage() {
                 onChange={(e) =>
                   updateFilter("endDate", e.target.value || undefined)
                 }
-                className="h-7 text-xs rounded-md border border-zinc-200 bg-white px-2 text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-300"
+                className="block h-8 text-xs rounded-sm border border-zinc-200 bg-white px-2.5 text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-300"
               />
             </div>
           </div>
@@ -331,7 +323,7 @@ export default function TransactionsPage() {
 
       {/* Error state */}
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 flex items-center gap-2">
+        <div className="rounded-sm border border-red-200 bg-red-50 p-4 text-sm text-red-700 flex items-center gap-2">
           <span className="font-medium">Gagal memuat transaksi.</span>
           <button onClick={refresh} className="underline hover:text-red-900">
             Coba lagi
@@ -340,7 +332,7 @@ export default function TransactionsPage() {
       )}
 
       {/* Table */}
-      <div className="border border-zinc-200 rounded-lg overflow-hidden bg-white">
+      <div className="border border-zinc-200 rounded-sm overflow-hidden bg-white">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>

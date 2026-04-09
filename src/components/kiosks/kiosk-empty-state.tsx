@@ -15,7 +15,7 @@ interface KioskEmptyStateProps {
 export function KioskEmptyState({ onAdd }: KioskEmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-zinc-100 mb-4">
+      <div className="flex h-14 w-14 items-center justify-center rounded-sm bg-zinc-100 mb-4">
         <Monitor className="h-7 w-7 text-zinc-400" />
       </div>
       <h3 className="text-lg font-semibold text-zinc-800 mb-1">

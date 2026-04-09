@@ -150,14 +150,14 @@ export function StepUploadCrop({ onNext, initialImage }: StepUploadCropProps) {
                     onDrop={handleDrop}
                     onClick={() => fileInputRef.current?.click()}
                     className={cn(
-                        "relative flex flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed cursor-pointer transition-all duration-200",
+                        "relative flex flex-col items-center justify-center gap-4 rounded-sm border-2 border-dashed cursor-pointer transition-all duration-200",
                         "py-20 px-8",
                         isDragging
                             ? "border-zinc-900 bg-zinc-50"
                             : "border-zinc-300 hover:border-zinc-400 bg-zinc-50/50",
                     )}
                 >
-                    <div className="flex size-14 items-center justify-center rounded-full bg-zinc-100">
+                    <div className="flex size-14 items-center justify-center rounded-sm bg-zinc-100">
                         <Upload className="size-6 text-zinc-400" />
                     </div>
                     <div className="text-center space-y-1">
@@ -204,7 +204,7 @@ export function StepUploadCrop({ onNext, initialImage }: StepUploadCropProps) {
                         </Button>
                     </div>
 
-                    <div className="rounded-xl border border-zinc-300 bg-zinc-200 p-4 flex items-center justify-center overflow-auto">
+                    <div className="rounded-sm border border-zinc-200 bg-zinc-100 p-4 flex items-center justify-center overflow-auto">
                         <ReactCrop
                             crop={crop}
                             onChange={(c) => setCrop(c)}
@@ -288,7 +288,7 @@ export function StepUploadCrop({ onNext, initialImage }: StepUploadCropProps) {
                         </Button>
                     </div>
 
-                    <div className="rounded-xl border border-zinc-300 bg-zinc-200 p-4 flex items-center justify-center">
+                    <div className="rounded-sm border border-zinc-200 bg-zinc-100 p-4 flex items-center justify-center">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                             src={croppedResult.dataUrl}

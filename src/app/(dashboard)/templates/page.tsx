@@ -13,7 +13,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -67,8 +66,8 @@ function TemplateCard({
   return (
     <article
       className={cn(
-        "group flex flex-col bg-white border border-zinc-200 overflow-hidden",
-        "hover:border-zinc-300 hover:shadow-md transition-all duration-200",
+        "group flex flex-col bg-white border border-zinc-200 rounded-sm overflow-hidden",
+        "hover:border-zinc-300 transition-all duration-200",
         !template.isActive && "opacity-55",
       )}
       style={{ containerType: "inline-size" }}
@@ -169,7 +168,7 @@ function TemplateCard({
 // ── Skeleton card ──────────────────────────────────────────────────────────────
 function TemplateCardSkeleton() {
   return (
-    <div className="flex flex-col bg-white border border-zinc-200 overflow-hidden">
+    <div className="flex flex-col bg-white border border-zinc-200 rounded-sm overflow-hidden">
       <Skeleton className="w-full" style={{ paddingBottom: "66%" }} />
       <div className="px-3.5 pt-3 pb-2.5 space-y-2">
         <div className="flex items-start justify-between">
@@ -277,20 +276,10 @@ export default function TemplatesPage() {
   return (
     <div className="space-y-6">
       {/* ── Header ── */}
-      <div className="flex items-start justify-between gap-4 pb-5 border-b border-zinc-100">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold text-zinc-950 tracking-tight">
-            Manajemen Template
-          </h1>
-          <p className="text-sm text-zinc-500">
-            Buat dan kelola template cetak untuk semua kiosk kamu.{" "}
-            {!isLoading && meta && (
-              <span className="text-zinc-400">
-                {meta.total} template
-              </span>
-            )}
-          </p>
-        </div>
+      <div className="flex items-start justify-between gap-4 pb-5 border-b border-zinc-200">
+        <h1 className="text-2xl font-semibold text-zinc-950 tracking-tight">
+          Template
+        </h1>
         <Link href="/templates/create">
           <Button
             size="sm"
@@ -403,27 +392,22 @@ export default function TemplatesPage() {
         open={deleteTarget !== null}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
       >
-        <DialogContent className="sm:max-w-105">
+        <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Trash2 className="size-4 text-red-500" />
-              Hapus Template
-            </DialogTitle>
+            <DialogTitle>Hapus Template</DialogTitle>
             <DialogDescription>
-              Yakin ingin menghapus template{" "}
+              Yakin ingin menghapus{" "}
               <strong>&ldquo;{deleteTarget?.name}&rdquo;</strong>? Tindakan ini
               tidak bisa dibatalkan.
             </DialogDescription>
           </DialogHeader>
-          <div className="rounded-md bg-amber-50 border border-amber-100 p-3 text-xs text-amber-700">
-            <strong>Catatan:</strong> Jika template sudah digunakan dalam
-            transaksi, template tidak bisa dihapus. Gunakan fitur nonaktifkan
-            sebagai alternatif.
+          <div className="rounded-sm bg-amber-50 border border-amber-100 p-3 text-xs text-amber-700">
+            Jika template sudah digunakan dalam transaksi, template tidak bisa
+            dihapus. Gunakan fitur nonaktifkan sebagai alternatif.
           </div>
-          <DialogFooter className="gap-2 sm:gap-0">
+          <div className="flex justify-end gap-2 pt-2">
             <Button
               variant="outline"
-              size="sm"
               onClick={() => setDeleteTarget(null)}
               disabled={isDeleting}
             >
@@ -431,15 +415,14 @@ export default function TemplatesPage() {
             </Button>
             <Button
               variant="destructive"
-              size="sm"
               onClick={handleDeleteConfirmAndReset}
               disabled={isDeleting}
               className="gap-1.5"
             >
               {isDeleting && <Loader2 className="size-3 animate-spin" />}
-              Hapus Template
+              Hapus
             </Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

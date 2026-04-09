@@ -31,7 +31,6 @@ import {
   ZoomOut,
   Maximize,
   Hand,
-  Magnet,
   Loader2,
   ChevronRight,
   Upload,
@@ -200,7 +199,7 @@ export function StepEditor({
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [panMode, setPanMode] = useState(false);
-  const [snapEnabled, setSnapEnabled] = useState(true);
+  const snapEnabled = true;
   const [isSaving, setIsSaving] = useState(false);
   const [showTemplateOptions, setShowTemplateOptions] = useState(false);
   const contentInputRef = useRef<HTMLInputElement>(null);
@@ -268,8 +267,6 @@ export function StepEditor({
 
   const handleWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
     e.preventDefault();
-    const delta = -e.deltaY * 0.001;
-    setZoom((z) => Math.min(Math.max(z + delta, ZOOM_MIN), ZOOM_MAX));
   }, []);
 
   // ── Element CRUD ──
@@ -496,7 +493,7 @@ export function StepEditor({
   // RENDER
   // ════════════════════════════════════════════════════════════════════════
   return (
-    <div className="h-full flex overflow-hidden rounded-xl border border-zinc-200">
+    <div className="h-full flex overflow-hidden rounded-sm border border-zinc-200">
       {/* ═══ LEFT — Canvas Workspace ═══ */}
       <div
         ref={canvasAreaRef}
@@ -531,11 +528,11 @@ export function StepEditor({
         </div>
 
         {/* Zoom controls — bottom left */}
-        <div className="absolute bottom-3 left-3 flex items-center gap-1 bg-white/90 backdrop-blur-sm border border-zinc-200 rounded-lg shadow-sm p-1">
+        <div className="absolute bottom-3 left-3 flex items-center gap-1 bg-white/90 backdrop-blur-sm border border-zinc-200 rounded-sm shadow-sm p-1">
           <button
             onClick={zoomOut}
             disabled={zoom <= ZOOM_MIN}
-            className="size-7 flex items-center justify-center rounded-md hover:bg-zinc-100 disabled:opacity-30 transition-colors"
+            className="size-7 flex items-center justify-center rounded-sm hover:bg-zinc-100 disabled:opacity-30 transition-colors"
           >
             <ZoomOut className="size-3.5" />
           </button>
@@ -545,7 +542,7 @@ export function StepEditor({
           <button
             onClick={zoomIn}
             disabled={zoom >= ZOOM_MAX}
-            className="size-7 flex items-center justify-center rounded-md hover:bg-zinc-100 disabled:opacity-30 transition-colors"
+            className="size-7 flex items-center justify-center rounded-sm hover:bg-zinc-100 disabled:opacity-30 transition-colors"
           >
             <ZoomIn className="size-3.5" />
           </button>
@@ -553,7 +550,7 @@ export function StepEditor({
           <button
             onClick={zoomFit}
             title="Fit to viewport"
-            className="size-7 flex items-center justify-center rounded-md hover:bg-zinc-100 transition-colors"
+            className="size-7 flex items-center justify-center rounded-sm hover:bg-zinc-100 transition-colors"
           >
             <Maximize className="size-3.5" />
           </button>
@@ -562,25 +559,13 @@ export function StepEditor({
             onClick={() => setPanMode(!panMode)}
             title={panMode ? "Mode geser (aktif)" : "Mode geser"}
             className={cn(
-              "size-7 flex items-center justify-center rounded-md transition-colors",
+              "size-7 flex items-center justify-center rounded-sm transition-colors",
               panMode
                 ? "bg-blue-50 text-blue-600 hover:bg-blue-100"
                 : "text-zinc-400 hover:bg-zinc-100",
             )}
           >
             <Hand className="size-3.5" />
-          </button>
-          <button
-            onClick={() => setSnapEnabled(!snapEnabled)}
-            title={snapEnabled ? "Snap aktif" : "Snap nonaktif"}
-            className={cn(
-              "size-7 flex items-center justify-center rounded-md transition-colors",
-              snapEnabled
-                ? "bg-rose-50 text-rose-500 hover:bg-rose-100"
-                : "text-zinc-400 hover:bg-zinc-100",
-            )}
-          >
-            <Magnet className="size-3.5" />
           </button>
         </div>
 
@@ -589,7 +574,7 @@ export function StepEditor({
           <button
             onClick={() => setPreviewMode(!previewMode)}
             className={cn(
-              "flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border shadow-sm transition-colors",
+              "flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-sm border shadow-sm transition-colors",
               previewMode
                 ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                 : "bg-white/90 backdrop-blur-sm text-zinc-500 border-zinc-200 hover:border-zinc-300",
@@ -609,7 +594,7 @@ export function StepEditor({
       <div className="w-80 shrink-0 border-l border-zinc-200 bg-white flex flex-col">
         <div className="flex-1 overflow-y-auto p-3 space-y-3">
           {/* Template Info */}
-          <div className="rounded-lg border border-zinc-200 overflow-hidden">
+          <div className="rounded-sm border border-zinc-200 overflow-hidden">
             <div className="px-3 py-2 border-b border-zinc-100 bg-zinc-50/50">
               <p className="text-xs font-semibold text-zinc-600 uppercase tracking-wider">
                 Template
@@ -711,7 +696,7 @@ export function StepEditor({
           </div>
 
           {/* Add Element */}
-          <div className="rounded-lg border border-zinc-200 overflow-hidden">
+          <div className="rounded-sm border border-zinc-200 overflow-hidden">
             <div className="px-3 py-2 border-b border-zinc-100 bg-zinc-50/50">
               <p className="text-xs font-semibold text-zinc-600 uppercase tracking-wider">
                 Tambah Element
@@ -746,7 +731,7 @@ export function StepEditor({
           </div>
 
           {/* Element List */}
-          <div className="rounded-lg border border-zinc-200 overflow-hidden">
+          <div className="rounded-sm border border-zinc-200 overflow-hidden">
             <div className="px-3 py-2 border-b border-zinc-100 bg-zinc-50/50">
               <p className="text-xs font-semibold text-zinc-600 uppercase tracking-wider">
                 Elements ({elements.length})
@@ -765,7 +750,7 @@ export function StepEditor({
                       key={el.id}
                       onClick={() => setSelectedId(el.id)}
                       className={cn(
-                        "flex items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 cursor-pointer transition-colors",
+                        "flex items-center justify-between gap-2 rounded-sm border px-2.5 py-1.5 cursor-pointer transition-colors",
                         el.id === selectedId
                           ? "border-blue-300 bg-blue-50"
                           : "border-zinc-100 hover:border-zinc-200 bg-white",
@@ -792,22 +777,17 @@ export function StepEditor({
                                 ? "I"
                                 : "S"}
                         </span>
-                        <div className="leading-none">
-                          <span className="text-xs text-zinc-700 font-medium">
-                            {el.elementType === "PHOTO_SLOT"
-                              ? `Foto ${elements.filter((e, i) => e.elementType === "PHOTO_SLOT" && i <= idx).length}`
-                              : el.elementType === "TEXT"
-                                ? (
-                                    (el.properties.content as string) || "Teks"
-                                  ).slice(0, 15)
-                                : el.elementType === "IMAGE"
-                                  ? "Gambar"
-                                  : "Bentuk"}
-                          </span>
-                          <span className="block font-mono text-[9px] text-zinc-400 mt-0.5">
-                            {el.width}×{el.height} · {el.rotation}°
-                          </span>
-                        </div>
+                        <span className="text-xs text-zinc-700 font-medium">
+                          {el.elementType === "PHOTO_SLOT"
+                            ? `Foto ${elements.filter((e, i) => e.elementType === "PHOTO_SLOT" && i <= idx).length}`
+                            : el.elementType === "TEXT"
+                              ? (
+                                  (el.properties.content as string) || "Teks"
+                                ).slice(0, 15)
+                              : el.elementType === "IMAGE"
+                                ? "Gambar"
+                                : "Bentuk"}
+                        </span>
                       </div>
                       <button
                         onClick={(e) => {
@@ -827,7 +807,7 @@ export function StepEditor({
 
           {/* Selected Element Properties */}
           {selectedEl && (
-            <div className="rounded-lg border border-blue-200 bg-blue-50/30 overflow-hidden">
+            <div className="rounded-sm border border-blue-200 bg-blue-50/30 overflow-hidden">
               <div className="px-3 py-2 border-b border-blue-100 bg-blue-50/50 flex items-center gap-1.5">
                 <MousePointer2 className="size-3 text-blue-500" />
                 <p className="text-xs font-semibold text-blue-700 uppercase tracking-wider">
@@ -956,7 +936,7 @@ export function StepEditor({
                         </p>
                       )}
                       {showVarDropdown && (
-                        <div className="border border-zinc-200 rounded-md bg-white shadow-sm max-h-40 overflow-y-auto">
+                        <div className="border border-zinc-200 rounded-sm bg-white shadow-sm max-h-40 overflow-y-auto">
                           {[
                             ...new Set(
                               TEMPLATE_VARIABLES.map((v) => v.category),
@@ -1024,7 +1004,7 @@ export function StepEditor({
                               e.target.value,
                             )
                           }
-                          className="h-7 w-full text-xs rounded-md border border-input bg-transparent px-2"
+                          className="h-7 w-full text-xs rounded-sm border border-input bg-transparent px-2"
                         >
                           <option value="400">Regular</option>
                           <option value="700">Bold</option>
@@ -1043,7 +1023,7 @@ export function StepEditor({
                               updateProperty(selectedEl.id, "textAlign", align)
                             }
                             className={cn(
-                              "flex-1 h-7 text-[10px] rounded-md border transition-colors",
+                              "flex-1 h-7 text-[10px] rounded-sm border transition-colors",
                               (selectedEl.properties.textAlign || "left") ===
                                 align
                                 ? "bg-blue-500 text-white border-blue-500"
@@ -1082,7 +1062,7 @@ export function StepEditor({
                           </div>
                           <button
                             onClick={() => imageUploadRef.current?.click()}
-                            className="w-full h-7 text-[10px] font-medium rounded-md border border-dashed border-zinc-300 text-zinc-400 hover:text-zinc-600 hover:border-zinc-400 transition-colors flex items-center justify-center gap-1"
+                            className="w-full h-7 text-[10px] font-medium rounded-sm border border-dashed border-zinc-300 text-zinc-400 hover:text-zinc-600 hover:border-zinc-400 transition-colors flex items-center justify-center gap-1"
                           >
                             <Upload className="size-2.5" /> Ganti Gambar
                           </button>
@@ -1090,7 +1070,7 @@ export function StepEditor({
                       ) : (
                         <button
                           onClick={() => imageUploadRef.current?.click()}
-                          className="w-full h-16 text-xs rounded-md border-2 border-dashed border-zinc-300 text-zinc-400 hover:text-zinc-600 hover:border-zinc-400 transition-colors flex flex-col items-center justify-center gap-1"
+                          className="w-full h-16 text-xs rounded-sm border-2 border-dashed border-zinc-300 text-zinc-400 hover:text-zinc-600 hover:border-zinc-400 transition-colors flex flex-col items-center justify-center gap-1"
                         >
                           <Upload className="size-4" />
                           <span>Upload Gambar</span>

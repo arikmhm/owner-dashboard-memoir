@@ -42,11 +42,11 @@ export default function CreateTemplatePage() {
         )}>
             {/* ── Header ── */}
             <div className={cn(
-                "flex items-center justify-between gap-4 pb-5 border-b border-zinc-100",
+                "flex items-center justify-between gap-4 pb-5 border-b border-zinc-200",
                 isEditor && "shrink-0 pb-3",
             )}>
                 <h1 className="text-2xl font-semibold text-zinc-950 tracking-tight">
-                    Buat Template Baru
+                    Buat Template
                 </h1>
                 <Link href="/templates">
                     <Button size="sm" variant="ghost" className="gap-1.5 text-zinc-400 hover:text-zinc-700">
@@ -79,7 +79,7 @@ export default function CreateTemplatePage() {
                             <div className="flex items-center gap-2.5">
                                 <div
                                     className={cn(
-                                        "flex items-center justify-center size-7 rounded-full border-2 transition-all",
+                                        "flex items-center justify-center size-7 rounded-sm border-2 transition-all",
                                         isActive
                                             ? "border-zinc-900 bg-zinc-900 text-white"
                                             : isDone
@@ -106,13 +106,6 @@ export default function CreateTemplatePage() {
                     );
                 })}
             </div>
-
-            {/* ── Step description ── */}
-            <p className={cn("text-sm text-zinc-500 -mt-2", isEditor && "shrink-0")}>
-                {currentStep === 1
-                    ? "Upload gambar lalu crop sesuai area yang diinginkan."
-                    : "Atur posisi slot foto dan teks pada template."}
-            </p>
 
             {/* ── Step content ── */}
             {currentStep === 1 && (

@@ -194,15 +194,10 @@ export default function SubscriptionPage() {
   return (
     <div className="space-y-8">
       {/* Page Header */}
-      <div className="flex items-start justify-between gap-4 pb-5 border-b border-zinc-100">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold text-zinc-950 tracking-tight">
-            Manajemen Subscription
-          </h1>
-          <p className="text-sm text-zinc-500">
-            Kelola plan, perpanjang, dan cek histori invoice.
-          </p>
-        </div>
+      <div className="flex items-start justify-between gap-4 pb-5 border-b border-zinc-200">
+        <h1 className="text-2xl font-semibold text-zinc-950 tracking-tight">
+          Subscription
+        </h1>
         <Button
           variant="outline"
           size="sm"
@@ -218,7 +213,7 @@ export default function SubscriptionPage() {
       </div>
 
       {/* Active Subscription Card */}
-      <div className="border border-zinc-200 rounded-xl bg-white overflow-hidden">
+      <div className="border border-zinc-200 rounded-sm bg-white overflow-hidden">
         <div className="px-6 py-5 space-y-4">
           {!subscription && !plansLoading ? (
             <div className="text-center py-4">
@@ -266,13 +261,13 @@ export default function SubscriptionPage() {
               {subscription?.currentPeriodStart &&
                 subscription?.currentPeriodEnd && (
                   <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div className="bg-zinc-50 rounded-lg px-4 py-3 space-y-0.5">
+                    <div className="bg-zinc-50 rounded-sm px-4 py-3 space-y-0.5">
                       <p className="text-zinc-400">Mulai</p>
                       <p className="font-medium text-zinc-900">
                         {formatDate(subscription.currentPeriodStart)}
                       </p>
                     </div>
-                    <div className="bg-zinc-50 rounded-lg px-4 py-3 space-y-0.5">
+                    <div className="bg-zinc-50 rounded-sm px-4 py-3 space-y-0.5">
                       <p className="text-zinc-400">Berakhir</p>
                       <p className="font-medium text-zinc-900">
                         {formatDate(subscription.currentPeriodEnd)}
@@ -296,7 +291,7 @@ export default function SubscriptionPage() {
                 )}
 
               {subscriptionStatus === "EXPIRED" && (
-                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 flex items-center gap-2">
+                <div className="rounded-sm border border-red-200 bg-red-50 p-3 text-xs text-red-700 flex items-center gap-2">
                   <AlertCircle className="size-3.5 shrink-0" />
                   Subscription sudah expired. Perpanjang untuk mengaktifkan
                   kembali kiosk.
@@ -348,7 +343,7 @@ export default function SubscriptionPage() {
 
         {/* Invoice Error */}
         {invoicesError && (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 flex items-center gap-2">
+          <div className="rounded-sm border border-red-200 bg-red-50 p-3 text-xs text-red-700 flex items-center gap-2">
             <AlertCircle className="size-3.5 shrink-0" />
             <span>Gagal memuat histori invoice.</span>
             <button
@@ -360,7 +355,7 @@ export default function SubscriptionPage() {
           </div>
         )}
 
-        <div className="border border-zinc-200 rounded-lg overflow-hidden bg-white">
+        <div className="border border-zinc-200 rounded-sm overflow-hidden bg-white">
           {/* Loading */}
           {invoicesLoading && invoices.length === 0 && (
             <div className="divide-y divide-zinc-100">
@@ -475,7 +470,7 @@ export default function SubscriptionPage() {
                     {/* Inline QR code display */}
                     {isQrVisible && inv.qrString && (
                       <div className="px-5 pb-4 flex items-start gap-4 bg-zinc-50/50">
-                        <div className="rounded-lg border border-zinc-200 bg-white p-2">
+                        <div className="rounded-sm border border-zinc-200 bg-white p-2">
                           <QRCodeSVG
                             value={inv.qrString}
                             size={100}
@@ -597,7 +592,7 @@ export default function SubscriptionPage() {
           {plansLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 py-2">
               {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="border rounded-xl p-5 space-y-4">
+                <div key={i} className="border rounded-sm p-5 space-y-4">
                   <Skeleton className="h-4 w-16" />
                   <Skeleton className="h-7 w-28" />
                   <Skeleton className="h-3 w-24" />
@@ -605,7 +600,7 @@ export default function SubscriptionPage() {
                     <Skeleton className="h-3 w-32" />
                     <Skeleton className="h-3 w-28" />
                   </div>
-                  <Skeleton className="h-8 w-full rounded-md" />
+                  <Skeleton className="h-8 w-full rounded-sm" />
                 </div>
               ))}
             </div>
@@ -626,7 +621,7 @@ export default function SubscriptionPage() {
                   <div
                     key={plan.id}
                     className={cn(
-                      "border rounded-xl p-5 space-y-4 transition relative",
+                      "border rounded-sm p-5 space-y-4 transition relative",
                       isCurrentPlan
                         ? "border-zinc-950 bg-zinc-50"
                         : "border-zinc-200 bg-white hover:border-zinc-400",

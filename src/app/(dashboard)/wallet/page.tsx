@@ -184,15 +184,10 @@ export default function WalletPage() {
   return (
     <div className="space-y-8">
       {/* Page Header */}
-      <div className="flex items-start justify-between gap-4 pb-5 border-b border-zinc-100">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold text-zinc-950 tracking-tight">
-            Wallet &amp; Keuangan
-          </h1>
-          <p className="text-sm text-zinc-500">
-            Pantau saldo dan histori mutasi keuangan kamu.
-          </p>
-        </div>
+      <div className="flex items-start justify-between gap-4 pb-5 border-b border-zinc-200">
+        <h1 className="text-2xl font-semibold text-zinc-950 tracking-tight">
+          Wallet
+        </h1>
         <Button
           variant="outline"
           size="sm"
@@ -211,7 +206,7 @@ export default function WalletPage() {
       </div>
 
       {/* Balance Card */}
-      <div className="border border-zinc-200 rounded-xl px-6 py-5 bg-white space-y-4">
+      <div className="border border-zinc-200 rounded-sm px-6 py-5 bg-white space-y-4">
         <div className="space-y-1">
           <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider">
             Saldo Tersedia
@@ -246,7 +241,7 @@ export default function WalletPage() {
 
       {/* Wallet Error */}
       {walletError && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 flex items-center gap-2">
+        <div className="rounded-sm border border-red-200 bg-red-50 p-4 text-sm text-red-700 flex items-center gap-2">
           <AlertCircle className="size-4 shrink-0" />
           <span>Gagal memuat data wallet.</span>
           <button
@@ -269,7 +264,7 @@ export default function WalletPage() {
           )}
         </div>
 
-        <div className="border border-zinc-200 rounded-lg overflow-hidden bg-white">
+        <div className="border border-zinc-200 rounded-sm overflow-hidden bg-white">
           {/* Loading */}
           {walletLoading && mutations.length === 0 && (
             <div className="divide-y divide-zinc-100">
@@ -403,7 +398,7 @@ export default function WalletPage() {
 
         {/* Withdrawal Error */}
         {withdrawalError && (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 flex items-center gap-2">
+          <div className="rounded-sm border border-red-200 bg-red-50 p-3 text-xs text-red-700 flex items-center gap-2">
             <AlertCircle className="size-3.5 shrink-0" />
             <span>Gagal memuat riwayat withdrawal.</span>
             <button
@@ -421,7 +416,7 @@ export default function WalletPage() {
             {Array.from({ length: 3 }).map((_, i) => (
               <div
                 key={i}
-                className="border border-zinc-200 rounded-lg px-5 py-3.5 bg-white"
+                className="border border-zinc-200 rounded-sm px-5 py-3.5 bg-white"
               >
                 <div className="flex items-center justify-between">
                   <div className="space-y-1.5">
@@ -437,7 +432,7 @@ export default function WalletPage() {
 
         {/* Empty */}
         {!withdrawalLoading && withdrawals.length === 0 && !withdrawalError && (
-          <div className="border border-zinc-200 rounded-lg py-10 text-center bg-white">
+          <div className="border border-zinc-200 rounded-sm py-10 text-center bg-white">
             <div className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center mx-auto mb-2">
               <Banknote className="size-4 text-zinc-400" />
             </div>
@@ -458,7 +453,7 @@ export default function WalletPage() {
               return (
                 <div
                   key={w.id}
-                  className="border border-zinc-200 rounded-lg px-5 py-3.5 bg-white hover:bg-zinc-50/50 transition-colors"
+                  className="border border-zinc-200 rounded-sm px-5 py-3.5 bg-white hover:bg-zinc-50/50 transition-colors"
                 >
                   <div className="flex items-center justify-between gap-4">
                     <div className="space-y-0.5 min-w-0">

@@ -74,7 +74,7 @@ export default function LoginPage() {
   // Show nothing while checking auth state (prevents flash)
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-50">
+      <div className="min-h-screen flex items-center justify-center bg-white">
         <Loader2
           className="h-5 w-5 animate-spin text-zinc-400"
           aria-label="Memuat..."
@@ -84,7 +84,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-zinc-50 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-white px-4">
       <div className="w-full max-w-sm space-y-6">
         {/* Logo / Brand */}
         <div className="text-center space-y-1">
@@ -95,7 +95,7 @@ export default function LoginPage() {
         </div>
 
         {/* Login Card */}
-        <Card className="border-zinc-200 shadow-sm">
+        <Card className="border-zinc-200 shadow-none rounded-sm">
           <CardContent className="pt-6 pb-6 px-6">
             <form
               onSubmit={handleSubmit(onSubmit)}
@@ -107,7 +107,7 @@ export default function LoginPage() {
               {apiError && (
                 <div
                   role="alert"
-                  className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5"
+                  className="flex items-start gap-2 rounded-sm border border-red-200 bg-red-50 px-3 py-2.5"
                 >
                   <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
                   <p className="text-sm text-red-700">{apiError}</p>

@@ -6,7 +6,6 @@
 // Data: single GET /owner/dashboard — server-side aggregation
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useAuth } from "@/components/auth-provider";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { formatRupiah } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -53,7 +52,7 @@ function SubscriptionBanner({
       return (
         <div
           role="alert"
-          className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3"
+          className="flex items-start gap-3 rounded-sm border border-red-200 bg-red-50 px-4 py-3"
         >
           <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
           <div className="min-w-0 flex-1">
@@ -79,7 +78,7 @@ function SubscriptionBanner({
       return (
         <div
           role="alert"
-          className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3"
+          className="flex items-start gap-3 rounded-sm border border-blue-200 bg-blue-50 px-4 py-3"
         >
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" />
           <div className="min-w-0 flex-1">
@@ -105,7 +104,7 @@ function SubscriptionBanner({
       return (
         <div
           role="alert"
-          className="flex items-start gap-3 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3"
+          className="flex items-start gap-3 rounded-sm border border-zinc-200 bg-zinc-50 px-4 py-3"
         >
           <Ban className="mt-0.5 h-5 w-5 shrink-0 text-zinc-400" />
           <div className="min-w-0 flex-1">
@@ -125,7 +124,7 @@ function SubscriptionBanner({
     case "ACTIVE":
     default:
       return (
-        <div className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-3">
+        <div className="flex items-center gap-3 rounded-sm border border-zinc-200 bg-white px-4 py-3">
           <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-zinc-900">
@@ -150,7 +149,7 @@ function SubscriptionBanner({
 
 function SubscriptionBannerSkeleton() {
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-3">
+    <div className="flex items-center gap-3 rounded-sm border border-zinc-200 bg-white px-4 py-3">
       <Skeleton className="h-5 w-5 shrink-0 rounded-full" />
       <div className="min-w-0 flex-1 space-y-2">
         <Skeleton className="h-4 w-48" />
@@ -178,7 +177,7 @@ function StatCard({ label, value, sub, icon: Icon }: StatCardProps) {
           <p className="text-xs font-medium uppercase tracking-wider text-zinc-400">
             {label}
           </p>
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-50">
+          <div className="flex h-8 w-8 items-center justify-center rounded-sm bg-zinc-50">
             <Icon className="h-4 w-4 text-zinc-400" />
           </div>
         </div>
@@ -199,7 +198,7 @@ function StatCardSkeleton() {
       <CardContent className="space-y-3 p-5">
         <div className="flex items-center justify-between">
           <Skeleton className="h-3 w-24" />
-          <Skeleton className="h-8 w-8 rounded-lg" />
+          <Skeleton className="h-8 w-8 rounded-sm" />
         </div>
         <Skeleton className="h-7 w-32" />
         <Skeleton className="h-3 w-40" />
@@ -211,11 +210,7 @@ function StatCardSkeleton() {
 // ── Main dashboard page ──────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const { user } = useAuth();
   const { summary, isLoading, isRefetching, error, refresh } = useDashboard();
-
-  // Display name: derive from user email or fallback
-  const displayName = user?.email?.split("@")[0] || "Owner";
 
   // Subscription derived values — all from server-aggregated summary
   const subStatus = summary?.subscriptionStatus ?? "EXPIRED";
@@ -274,15 +269,10 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8">
       {/* ── Heading ─────────────────────────────────────────────────────── */}
-      <div className="flex items-end justify-between border-b border-zinc-100 pb-5">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-950">
-            Selamat datang, {displayName}
-          </h1>
-          <p className="text-sm text-zinc-500">
-            Berikut ringkasan aktivitas studio kamu hari ini.
-          </p>
-        </div>
+      <div className="flex items-end justify-between border-b border-zinc-200 pb-5">
+        <h1 className="text-2xl font-semibold tracking-tight text-zinc-950">
+          Dashboard
+        </h1>
         <Button
           variant="ghost"
           size="sm"
@@ -300,7 +290,7 @@ export default function DashboardPage() {
       {error && !isLoading && (
         <div
           role="alert"
-          className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3"
+          className="flex items-start gap-3 rounded-sm border border-red-200 bg-red-50 px-4 py-3"
         >
           <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
           <div className="min-w-0 flex-1">

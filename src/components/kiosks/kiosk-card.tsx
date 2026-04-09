@@ -34,10 +34,10 @@ export function KioskCard({
 
   return (
     <Card
-      className={`py-0 gap-0 rounded-none shadow-none border-l-2 transition-opacity ${
+      className={`py-0 gap-0 rounded-sm shadow-none transition-opacity ${
         kiosk.isActive
-          ? "border-l-zinc-950 opacity-100"
-          : "border-l-zinc-200 opacity-55"
+          ? "border-zinc-200 opacity-100"
+          : "border-zinc-200 opacity-55"
       }`}
     >
       {/* Header — name, status, badge */}

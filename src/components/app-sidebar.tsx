@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import {
   LayoutDashboard,
   MonitorSmartphone,
@@ -26,6 +27,14 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/components/auth-provider";
 import { usePlans } from "@/hooks/use-subscription";
@@ -60,6 +69,7 @@ export function AppSidebar() {
   const pathname = usePathname();
   const { user, subscription, logout } = useAuth();
   const { plans } = usePlans();
+  const [logoutOpen, setLogoutOpen] = useState(false);
 
   // Derive display info from auth context
   const displayName = user?.email?.split("@")[0] ?? "owner";
@@ -142,7 +152,7 @@ export function AppSidebar() {
             </span>
           </div>
           <button
-            onClick={logout}
+            onClick={() => setLogoutOpen(true)}
             className="ml-auto shrink-0 text-zinc-400 hover:text-zinc-700 transition-colors group-data-[collapsible=icon]:hidden"
             title="Keluar"
           >
@@ -150,6 +160,32 @@ export function AppSidebar() {
           </button>
         </div>
       </SidebarFooter>
+
+      {/* Logout Confirmation */}
+      <Dialog open={logoutOpen} onOpenChange={setLogoutOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Keluar dari akun?</DialogTitle>
+            <DialogDescription>
+              Kamu perlu login ulang untuk mengakses dashboard.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              variant="outline"
+              onClick={() => setLogoutOpen(false)}
+            >
+              Batal
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={logout}
+            >
+              Keluar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Sidebar>
   );
 }

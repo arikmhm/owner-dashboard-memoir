@@ -73,20 +73,10 @@ export default function KiosksPage() {
   return (
     <div className="space-y-8">
       {/* Page Header */}
-      <div className="flex items-start justify-between gap-4 pb-5 border-b border-zinc-100">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold text-zinc-950 tracking-tight">
-            Manajemen Kiosk
-          </h1>
-          <p className="text-sm text-zinc-500">
-            Kelola semua booth fisik dan kode pairing kamu.
-            {!isLoading && (
-              <span className="text-zinc-400 ml-1">
-                {activeCount} / {maxKiosks} kiosk aktif
-              </span>
-            )}
-          </p>
-        </div>
+      <div className="flex items-start justify-between gap-4 pb-5 border-b border-zinc-200">
+        <h1 className="text-2xl font-semibold text-zinc-950 tracking-tight">
+          Kiosk
+        </h1>
 
         {/* Add Kiosk Button — disabled with tooltip when max reached */}
         {maxReached ? (
@@ -125,7 +115,7 @@ export default function KiosksPage() {
 
       {/* Error state */}
       {error && !isLoading && (
-        <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4">
+        <div className="flex items-start gap-3 rounded-sm border border-red-200 bg-red-50 p-4">
           <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
           <div>
             <p className="text-sm font-medium text-red-800">

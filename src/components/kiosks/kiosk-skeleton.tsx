@@ -10,10 +10,10 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 export function KioskCardSkeleton() {
   return (
-    <Card className="py-0 gap-0">
+    <Card className="py-0 gap-0 rounded-sm shadow-none border-zinc-200">
       <CardHeader className="py-4 pb-0">
         <div className="flex items-start gap-3">
-          <Skeleton className="h-9 w-9 rounded-lg shrink-0" />
+          <Skeleton className="h-9 w-9 rounded-sm shrink-0" />
           <div className="min-w-0 flex-1 space-y-2">
             <Skeleton className="h-4 w-32" />
             <Skeleton className="h-3 w-24" />
@@ -31,8 +31,8 @@ export function KioskCardSkeleton() {
           ))}
         </div>
         <div className="flex items-center gap-2 pt-1">
-          <Skeleton className="h-8 w-24 rounded-md" />
-          <Skeleton className="h-8 w-40 rounded-md" />
+          <Skeleton className="h-8 w-24 rounded-sm" />
+          <Skeleton className="h-8 w-40 rounded-sm" />
         </div>
       </CardContent>
     </Card>
