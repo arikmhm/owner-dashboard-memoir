@@ -11,12 +11,22 @@ import type { Kiosk } from "@/lib/types";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
+/**
+ * Create kiosk request body.
+ * 
+ * Required:
+ * - name: Kiosk name (min length 1)
+ * 
+ * Optional pricing (if not provided, BE applies defaults):
+ * - priceBaseSession: 25,000 IDR
+ * - pricePerExtraPrint: 5,000 IDR
+ * - priceDigitalCopy: 10,000 IDR
+ */
 export interface CreateKioskRequest {
   name: string;
   priceBaseSession?: number;
   pricePerExtraPrint?: number;
   priceDigitalCopy?: number;
-  isActive?: boolean;
 }
 
 export interface CreateKioskResponse {
@@ -27,14 +37,38 @@ export interface CreateKioskResponse {
   };
 }
 
+/**
+ * Update kiosk request body (PATCH /owner/kiosks/{id}).
+ * 
+ * All fields are optional. Partial update supported by BE per spec:
+ * - Only fields provided in request body will be updated
+ * - Fields omitted are not changed (immutable)
+ * 
+ * Important notes:
+ * - Pricing updates apply only to new transactions onwards
+ * - Previous transaction prices are snapshots (immutable & historic)
+ * - Ownership: BE validates ownership (404 NOT_FOUND if unauthorized/not found)
+ */
 export interface UpdateKioskRequest {
   name?: string;
   priceBaseSession?: number;
   pricePerExtraPrint?: number;
   priceDigitalCopy?: number;
-  isActive?: boolean;
 }
 
+/**
+ * Generate Pairing Code response (POST /owner/kiosks/{id}/generate-pairing).
+ * 
+ * Important side effects when new code is generated:
+ * - Resets kiosk's deviceToken to null
+ * - Resets pairedAt timestamp to null
+ * - Sets new pairingCodeExpiresAt with fresh expiry time
+ * - Previous pairing code becomes invalid immediately
+ * - Any running Electron device loses access (receives 401 unauthorized)
+ * 
+ * Code format: 6-digit numeric string (000000 - 999999)
+ * Code expiry: Device must pair before code expires (backend determines timeframe)
+ */
 export interface GeneratePairingResponse {
   pairingCode: string;
 }
@@ -48,8 +82,6 @@ const KIOSKS_KEY = ["/owner/kiosks"] as const;
 export interface UseKiosksReturn {
   /** List of all kiosks */
   kiosks: Kiosk[];
-  /** Number of currently active kiosks */
-  activeCount: number;
   /** Whether kiosk data is loading */
   isLoading: boolean;
   /** Error from list fetch */
@@ -161,12 +193,12 @@ export function useKiosks(): UseKiosksReturn {
     mutationFn: async (id: string): Promise<GeneratePairingResponse> => {
       const res = await api.post<ApiSuccessResponse<GeneratePairingResponse>>(
         `/owner/kiosks/${id}/generate-pairing`,
-        {},
+        {}, // BE requires empty body
       );
       return res.data;
     },
     onSuccess: () => {
-      // Revalidate to get fresh pairedAt status
+      // Revalidate to fetch fresh pairedAt (reset to null on new code)
       queryClient.invalidateQueries({ queryKey: KIOSKS_KEY });
     },
   });
@@ -174,7 +206,6 @@ export function useKiosks(): UseKiosksReturn {
   // ── Derived values ─────────────────────────────────────────────────────
 
   const kioskList = kiosks ?? [];
-  const activeCount = kioskList.filter((k) => k.isActive).length;
 
   // ── Actions (wrap mutations for a clean API) ───────────────────────────
 
@@ -197,7 +228,6 @@ export function useKiosks(): UseKiosksReturn {
 
   return {
     kiosks: kioskList,
-    activeCount,
     isLoading,
     error: (error as Error) ?? null,
     refresh: () => queryClient.invalidateQueries({ queryKey: KIOSKS_KEY }),

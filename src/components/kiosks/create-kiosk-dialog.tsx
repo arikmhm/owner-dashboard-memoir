@@ -4,6 +4,12 @@
 // memoir. — Create Kiosk Dialog
 // Modal form for creating a new kiosk (FEAT-OD-03.2)
 // After success, displays the generated pairing code (FEAT-OD-03.3)
+// 
+// Pricing note: Collected via name only. BE applies defaults:
+// - priceBaseSession: 25,000 IDR
+// - pricePerExtraPrint: 5,000 IDR
+// - priceDigitalCopy: 10,000 IDR
+// Owner can edit pricing post-create via Edit Kiosk dialog.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useCallback, useRef, useEffect } from "react";
@@ -92,8 +98,26 @@ export function CreateKioskDialog({
         toast.success(`Kiosk "${result.kiosk.name}" berhasil dibuat!`);
       } catch (err) {
         if (err instanceof ApiError) {
+          // Handle specific errors from BE
           if (err.status === 403 && err.code === "MAX_KIOSKS_REACHED") {
             toast.error("Limit kiosk tercapai. Upgrade plan untuk menambah.");
+          } else if (err.status === 403) {
+            // Catch all 403 — could be subscription required or other permission issue
+            toast.error(
+              err.message ||
+                "Anda harus memiliki subscription aktif untuk membuat kiosk"
+            );
+          } else if (err.status === 400) {
+            // Validation error from BE
+            toast.error(
+              err.message || "Data tidak valid. Periksa kembali form Anda."
+            );
+          } else if (err.status === 401) {
+            // Token expired/invalid
+            toast.error("Session expired. Silakan login kembali.");
+          } else if (err.status === 404) {
+            // Edge case: plan not found
+            toast.error("Konfigurasi plan tidak ditemukan. Hubungi support.");
           } else {
             toast.error(err.message || "Gagal membuat kiosk");
           }

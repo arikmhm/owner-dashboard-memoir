@@ -7,16 +7,12 @@ import { api } from "@/lib/api";
 import type { ApiPaginatedResponse } from "@/lib/api";
 import type {
   Transaction,
+  TransactionDetail,
+  TransactionType,
   TxStatus,
   PaymentMethod,
   PaginationMeta,
 } from "@/lib/types";
-
-// ─────────────────────────────────────────────────────────────────────────────
-// memoir. — Transaction History Hook
-// TanStack Query data fetching for EPIC-OD-05
-// Best practices: client-query-dedup, keepPreviousData for pagination
-// ─────────────────────────────────────────────────────────────────────────────
 
 // ── Filter params ────────────────────────────────────────────────────────────
 
@@ -24,6 +20,7 @@ export interface TransactionFilters {
   kioskId?: string;
   status?: TxStatus;
   paymentMethod?: PaymentMethod;
+  transactionType?: TransactionType;
   startDate?: string;
   endDate?: string;
   search?: string;
@@ -46,6 +43,7 @@ function buildQueryString(filters: TransactionFilters): string {
   if (filters.kioskId) params.set("kioskId", filters.kioskId);
   if (filters.status) params.set("status", filters.status);
   if (filters.paymentMethod) params.set("paymentMethod", filters.paymentMethod);
+  if (filters.transactionType) params.set("transactionType", filters.transactionType);
   if (filters.startDate) params.set("startDate", filters.startDate);
   if (filters.endDate) params.set("endDate", filters.endDate);
   if (filters.search) params.set("search", filters.search);
@@ -55,20 +53,14 @@ function buildQueryString(filters: TransactionFilters): string {
   return params.toString();
 }
 
-// ── Main Hook ────────────────────────────────────────────────────────────────
+// ── List Hook ────────────────────────────────────────────────────────────────
 
 export interface UseTransactionsReturn {
-  /** Paginated list of transactions */
   transactions: Transaction[];
-  /** Pagination metadata */
   meta: PaginationMeta | null;
-  /** Whether data is loading */
   isLoading: boolean;
-  /** Whether data is being refetched in background */
   isRefetching: boolean;
-  /** Error from fetch */
   error: Error | null;
-  /** Revalidate list */
   refresh: () => void;
 }
 
@@ -100,5 +92,35 @@ export function useTransactions(
     error: (error as Error) ?? null,
     refresh: () =>
       queryClient.invalidateQueries({ queryKey: ["transactions", qs] }),
+  };
+}
+
+// ── Detail Hook ───────────────────────────────────────────────────────────────
+
+export interface UseTransactionDetailReturn {
+  detail: TransactionDetail | null;
+  isLoading: boolean;
+  error: Error | null;
+}
+
+export function useTransactionDetail(
+  id: string | null,
+): UseTransactionDetailReturn {
+  const { data, error, isLoading } = useQuery<TransactionDetail>({
+    queryKey: ["transaction", id],
+    queryFn: async (): Promise<TransactionDetail> => {
+      const res = await api.get<{ data: { transaction: TransactionDetail } }>(
+        `/owner/transactions/${id}`,
+      );
+      return res.data.transaction;
+    },
+    enabled: !!id,
+    staleTime: 60_000,
+  });
+
+  return {
+    detail: data ?? null,
+    isLoading,
+    error: (error as Error) ?? null,
   };
 }

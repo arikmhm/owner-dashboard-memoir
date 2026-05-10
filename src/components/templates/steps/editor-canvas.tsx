@@ -27,7 +27,6 @@ export interface TemplateElement {
   width: number;
   height: number;
   rotation: number;
-  opacity: number;
   sequence: number;
   properties: Record<string, unknown>;
 }
@@ -323,7 +322,7 @@ export default function EditorCanvas({
                 width={el.width}
                 height={el.height}
                 rotation={el.rotation}
-                opacity={el.opacity / 100}
+                opacity={1}
                 fill="rgba(59, 130, 246, 0.08)"
                 stroke={isSelected ? "#2563eb" : "#3b82f6"}
                 strokeWidth={isSelected ? 2 : 1}
@@ -357,7 +356,7 @@ export default function EditorCanvas({
                 width={el.width}
                 height={el.height}
                 rotation={el.rotation}
-                opacity={el.opacity / 100}
+                opacity={1}
                 text={
                   previewMode
                     ? resolveVariables(
@@ -396,7 +395,7 @@ export default function EditorCanvas({
                 width={el.width}
                 height={el.height}
                 rotation={el.rotation}
-                opacity={el.opacity / 100}
+                opacity={1}
                 stroke={isSelected ? "#8b5cf6" : undefined}
                 strokeWidth={isSelected ? 2 : 0}
                 draggable={!previewMode}

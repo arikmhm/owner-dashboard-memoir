@@ -2,7 +2,8 @@
 
 // ─────────────────────────────────────────────────────────────────────────────
 // memoir. — Edit Kiosk Dialog
-// Modal for editing kiosk name, pricing, and active status (FEAT-OD-03.2)
+// Modal for editing kiosk name and/or pricing (FEAT-OD-03.2)
+// PATCH /owner/kiosks/{id}: partial update allowed. Only changed fields submitted.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useCallback, useEffect } from "react";
@@ -17,7 +18,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -44,7 +44,6 @@ export function EditKioskDialog({
   const [priceBaseSession, setPriceBaseSession] = useState("");
   const [pricePerExtraPrint, setPricePerExtraPrint] = useState("");
   const [priceDigitalCopy, setPriceDigitalCopy] = useState("");
-  const [isActive, setIsActive] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Populate form when kiosk changes
@@ -54,7 +53,6 @@ export function EditKioskDialog({
       setPriceBaseSession(String(kiosk.priceBaseSession));
       setPricePerExtraPrint(String(kiosk.pricePerExtraPrint));
       setPriceDigitalCopy(String(kiosk.priceDigitalCopy));
-      setIsActive(kiosk.isActive);
       setErrors({});
     }
   }, [kiosk]);
@@ -62,23 +60,31 @@ export function EditKioskDialog({
   const validate = useCallback((): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (!name.trim()) {
-      newErrors.name = "Nama kiosk wajib diisi";
+    // Name is optional per BE (partial update), but if provided must not be empty
+    if (name.trim() === "") {
+      newErrors.name = "Nama kiosk tidak boleh kosong jika diubah";
     }
 
-    const basePrice = Number(priceBaseSession);
-    if (!priceBaseSession || isNaN(basePrice) || basePrice < 0) {
-      newErrors.priceBaseSession = "Harga harus angka valid ≥ 0";
+    // Validate each price only if it has a value (optional fields)
+    if (priceBaseSession) {
+      const basePrice = Number(priceBaseSession);
+      if (isNaN(basePrice) || basePrice < 0) {
+        newErrors.priceBaseSession = "Harga harus angka valid ≥ 0";
+      }
     }
 
-    const extraPrice = Number(pricePerExtraPrint);
-    if (!pricePerExtraPrint || isNaN(extraPrice) || extraPrice < 0) {
-      newErrors.pricePerExtraPrint = "Harga harus angka valid ≥ 0";
+    if (pricePerExtraPrint) {
+      const extraPrice = Number(pricePerExtraPrint);
+      if (isNaN(extraPrice) || extraPrice < 0) {
+        newErrors.pricePerExtraPrint = "Harga harus angka valid ≥ 0";
+      }
     }
 
-    const digitalPrice = Number(priceDigitalCopy);
-    if (!priceDigitalCopy || isNaN(digitalPrice) || digitalPrice < 0) {
-      newErrors.priceDigitalCopy = "Harga harus angka valid ≥ 0";
+    if (priceDigitalCopy) {
+      const digitalPrice = Number(priceDigitalCopy);
+      if (isNaN(digitalPrice) || digitalPrice < 0) {
+        newErrors.priceDigitalCopy = "Harga harus angka valid ≥ 0";
+      }
     }
 
     setErrors(newErrors);
@@ -91,18 +97,50 @@ export function EditKioskDialog({
       if (!kiosk || !validate()) return;
 
       try {
-        await onSubmit(kiosk.id, {
-          name: name.trim(),
-          priceBaseSession: Number(priceBaseSession),
-          pricePerExtraPrint: Number(pricePerExtraPrint),
-          priceDigitalCopy: Number(priceDigitalCopy),
-          isActive,
-        });
+        // Build update payload with only changed fields (partial update per BE spec)
+        const updateData: Record<string, unknown> = {};
+        if (name.trim() !== kiosk.name) updateData.name = name.trim();
+        if (priceBaseSession && Number(priceBaseSession) !== kiosk.priceBaseSession) {
+          updateData.priceBaseSession = Number(priceBaseSession);
+        }
+        if (
+          pricePerExtraPrint &&
+          Number(pricePerExtraPrint) !== kiosk.pricePerExtraPrint
+        ) {
+          updateData.pricePerExtraPrint = Number(pricePerExtraPrint);
+        }
+        if (
+          priceDigitalCopy &&
+          Number(priceDigitalCopy) !== kiosk.priceDigitalCopy
+        ) {
+          updateData.priceDigitalCopy = Number(priceDigitalCopy);
+        }
+
+        // Only submit if there are actual changes
+        if (Object.keys(updateData).length === 0) {
+          toast.info("Tidak ada perubahan");
+          return;
+        }
+
+        await onSubmit(kiosk.id, updateData as UpdateKioskRequest);
         toast.success("Kiosk berhasil diperbarui");
         onOpenChange(false);
       } catch (err) {
         if (err instanceof ApiError) {
-          toast.error(err.message || "Gagal memperbarui kiosk");
+          // Handle specific error codes from BE API
+          if (err.status === 400) {
+            toast.error(
+              err.message || "Data tidak valid. Periksa kembali form Anda."
+            );
+          } else if (err.status === 404) {
+            toast.error(
+              "Kiosk tidak ditemukan atau Anda tidak memiliki akses. Coba refresh halaman."
+            );
+          } else if (err.status === 401) {
+            toast.error("Session expired. Silakan login kembali.");
+          } else {
+            toast.error(err.message || "Gagal memperbarui kiosk");
+          }
         } else {
           toast.error("Terjadi kesalahan, coba lagi nanti");
         }
@@ -114,7 +152,6 @@ export function EditKioskDialog({
       priceBaseSession,
       pricePerExtraPrint,
       priceDigitalCopy,
-      isActive,
       validate,
       onSubmit,
       onOpenChange,
@@ -129,8 +166,7 @@ export function EditKioskDialog({
         <DialogHeader>
           <DialogTitle>Edit Kiosk</DialogTitle>
           <DialogDescription>
-            Ubah informasi dan harga default kiosk. Perubahan harga akan berlaku
-            untuk transaksi baru.
+            Ubah informasi dan harga default kiosk.
           </DialogDescription>
         </DialogHeader>
 
@@ -203,27 +239,6 @@ export function EditKioskDialog({
           </div>
 
           <Separator />
-
-          {/* Active toggle */}
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label
-                htmlFor="edit-kiosk-active"
-                className="text-sm font-medium"
-              >
-                Status Aktif
-              </Label>
-              <p className="text-xs text-zinc-400">
-                Nonaktifkan kiosk yang sedang tidak beroperasi
-              </p>
-            </div>
-            <Switch
-              id="edit-kiosk-active"
-              checked={isActive}
-              onCheckedChange={setIsActive}
-              disabled={isSubmitting}
-            />
-          </div>
 
           <DialogFooter>
             <Button

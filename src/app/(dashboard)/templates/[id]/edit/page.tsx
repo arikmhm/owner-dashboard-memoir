@@ -47,7 +47,7 @@ export default function EditTemplatePage({
   }
 
   // ── Error state (including missing background) ──
-  if (error || !template || !template.backgroundUrl) {
+  if (error || !template || !template.id) {
     return (
       <div className="flex flex-col gap-6">
         <div className="flex items-center justify-between gap-4 pb-5 border-b border-zinc-100">
@@ -73,7 +73,7 @@ export default function EditTemplatePage({
             {error?.message ??
               (!template
                 ? "Template tidak ditemukan"
-                : "Background template tidak tersedia")}
+                : "Data template tidak valid, coba refresh halaman")}
           </p>
           <Link href="/templates">
             <Button size="sm" variant="outline" className="mt-2">

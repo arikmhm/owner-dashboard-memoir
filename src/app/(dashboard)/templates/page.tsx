@@ -6,7 +6,6 @@ import {
   useTemplateElements,
   ApiError,
 } from "@/hooks/use-templates";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -26,8 +25,6 @@ import {
   Layers,
   Pencil,
   Plus,
-  ToggleLeft,
-  ToggleRight,
   Trash2,
   Loader2,
   AlertTriangle,
@@ -38,18 +35,14 @@ import type { Template } from "@/lib/types";
 // ── Template card ──────────────────────────────────────────────────────────────
 interface TemplateCardProps {
   template: Template;
-  onToggleActive: (id: string, current: boolean) => void;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
-  isTogglingId: string | null;
 }
 
 function TemplateCard({
   template,
-  onToggleActive,
   onEdit,
   onDelete,
-  isTogglingId,
 }: TemplateCardProps) {
   const { elements, isLoading: elementsLoading } = useTemplateElements(
     template.id,
@@ -57,18 +50,11 @@ function TemplateCard({
   const slotCount = elements.filter(
     (el) => el.elementType === "PHOTO_SLOT",
   ).length;
-  const hasOverride =
-    template.overridePriceBase != null ||
-    template.overridePriceExtraPrint != null ||
-    template.overridePriceDigitalCopy != null;
-  const isToggling = isTogglingId === template.id;
-
   return (
     <article
       className={cn(
         "group flex flex-col bg-white border border-zinc-200 rounded-sm overflow-hidden",
         "hover:border-zinc-300 transition-all duration-200",
-        !template.isActive && "opacity-55",
       )}
       style={{ containerType: "inline-size" }}
     >
@@ -76,89 +62,42 @@ function TemplateCard({
       <TemplatePreview
         canvasWidth={template.width}
         canvasHeight={template.height}
-        backgroundUrl={template.backgroundUrl}
+        backgroundUrl={template.backgroundUrl ?? undefined}
         elements={elements}
         isLoading={elementsLoading}
-        inactive={!template.isActive}
         maxRatio={1.2}
       />
 
       {/* ── Card Info ── */}
-      <div className="flex-1 px-3.5 pt-3 pb-2.5 space-y-2">
-        <div className="flex items-start justify-between gap-2">
-          <h3
-            className="text-sm font-semibold text-zinc-900 truncate leading-snug"
-            title={template.name}
-          >
-            {template.name}
-          </h3>
-          <Badge
-            className={cn(
-              "font-mono text-[8px] px-1.5 h-4 rounded-sm tracking-widest shrink-0",
-              template.isActive
-                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                : "bg-zinc-100 text-zinc-400 border border-zinc-200",
-            )}
-          >
-            {template.isActive ? "AKTIF" : "OFF"}
-          </Badge>
-        </div>
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="font-mono text-[10px] text-zinc-500 bg-zinc-50 border border-zinc-100 px-1.5 py-0.5 rounded-sm">
-            {slotCount} slot
-          </span>
-          <span className="font-mono text-[10px] text-zinc-400">
-            {template.width}×{template.height}
-          </span>
-          {hasOverride && (
-            <span className="font-mono text-[10px] text-amber-600 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded-sm">
-              Harga khusus
-            </span>
-          )}
-        </div>
+      <div className="flex-1 px-3.5 pt-3 pb-2.5 space-y-1">
+        <h3
+          className="text-sm font-semibold text-zinc-900 truncate leading-snug"
+          title={template.name}
+        >
+          {template.name}
+        </h3>
+        <p className="text-xs text-zinc-400">{slotCount} foto</p>
       </div>
 
       {/* ── Actions ── */}
-      <div className="px-3 py-2 border-t border-zinc-100 flex items-center justify-between">
-        <div className="flex gap-0.5">
-          <Button
-            size="icon-xs"
-            variant="ghost"
-            className="text-zinc-400 hover:text-blue-600 hover:bg-blue-50"
-            title="Edit template"
-            onClick={() => onEdit(template.id)}
-          >
-            <Pencil className="size-3" />
-          </Button>
-          <Button
-            size="icon-xs"
-            variant="ghost"
-            className="text-zinc-400 hover:text-red-500 hover:bg-red-50"
-            title="Hapus template"
-            onClick={() => onDelete(template.id)}
-          >
-            <Trash2 className="size-3" />
-          </Button>
-        </div>
+      <div className="px-3 pb-3 pt-0 flex flex-col gap-2">
         <Button
-          size="icon-xs"
-          variant="ghost"
-          disabled={isToggling}
-          className={cn(
-            template.isActive
-              ? "text-zinc-700 hover:text-zinc-500"
-              : "text-zinc-300 hover:text-zinc-500",
-          )}
-          title={template.isActive ? "Nonaktifkan" : "Aktifkan"}
-          onClick={() => onToggleActive(template.id, template.isActive)}
+          size="sm"
+          variant="outline"
+          className="w-full text-xs"
+          onClick={() => onEdit(template.id)}
         >
-          {isToggling ? (
-            <Loader2 className="size-3.5 animate-spin" />
-          ) : template.isActive ? (
-            <ToggleRight className="size-3.5" />
-          ) : (
-            <ToggleLeft className="size-3.5" />
-          )}
+          <Pencil className="h-3.5 w-3.5 mr-1.5" />
+          Edit Template
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="w-full text-xs text-red-500 hover:text-red-600 hover:bg-red-50 hover:border-red-200"
+          onClick={() => onDelete(template.id)}
+        >
+          <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+          Hapus
         </Button>
       </div>
     </article>
@@ -170,22 +109,13 @@ function TemplateCardSkeleton() {
   return (
     <div className="flex flex-col bg-white border border-zinc-200 rounded-sm overflow-hidden">
       <Skeleton className="w-full" style={{ paddingBottom: "66%" }} />
-      <div className="px-3.5 pt-3 pb-2.5 space-y-2">
-        <div className="flex items-start justify-between">
-          <Skeleton className="h-4 w-28" />
-          <Skeleton className="h-4 w-10" />
-        </div>
-        <div className="flex gap-1.5">
-          <Skeleton className="h-4 w-12" />
-          <Skeleton className="h-4 w-16" />
-        </div>
+      <div className="px-3.5 pt-3 pb-2.5 space-y-1.5">
+        <Skeleton className="h-4 w-28" />
+        <Skeleton className="h-3 w-12" />
       </div>
-      <div className="px-3 py-2 border-t border-zinc-100 flex justify-between">
-        <div className="flex gap-1">
-          <Skeleton className="size-6" />
-          <Skeleton className="size-6" />
-        </div>
-        <Skeleton className="size-6" />
+      <div className="px-3 pb-3 pt-0 flex flex-col gap-2">
+        <Skeleton className="h-8 w-full" />
+        <Skeleton className="h-8 w-full" />
       </div>
     </div>
   );
@@ -203,30 +133,14 @@ export default function TemplatesPage() {
     isLoading,
     isFetching,
     error,
-    toggleActive,
     deleteTemplate,
   } = useTemplates({ page, limit: DEFAULT_LIMIT });
 
   const [deleteTarget, setDeleteTarget] = useState<Template | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const totalPages = meta ? Math.ceil(meta.total / meta.limit) : 0;
   const goToPage = useCallback((p: number) => setPage(p), []);
-
-  const handleToggleActive = async (id: string, currentActive: boolean) => {
-    setTogglingId(id);
-    try {
-      await toggleActive(id, currentActive);
-      toast.success(
-        currentActive ? "Template dinonaktifkan" : "Template diaktifkan",
-      );
-    } catch {
-      toast.error("Gagal mengubah status template");
-    } finally {
-      setTogglingId(null);
-    }
-  };
 
   const handleEdit = (id: string) => {
     router.push(`/templates/${id}/edit`);
@@ -325,12 +239,10 @@ export default function TemplatesPage() {
             <TemplateCard
               key={tpl.id}
               template={tpl}
-              onToggleActive={handleToggleActive}
               onEdit={handleEdit}
               onDelete={(id) =>
                 setDeleteTarget(templates.find((t) => t.id === id) ?? null)
               }
-              isTogglingId={togglingId}
             />
           ))}
         </div>

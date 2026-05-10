@@ -12,7 +12,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "memoir. | Owner Dashboard",
+  title: "memoir. | Dashboard",
   description: "Kelola kiosk, template, transaksi, dan keuangan studio Anda.",
 };
 
@@ -27,7 +27,7 @@ export default function RootLayout({
         <QueryProvider>
           <AuthProvider>
             <TooltipProvider>{children}</TooltipProvider>
-            <Toaster richColors position="top-right" />
+            <Toaster position="top-right" />
           </AuthProvider>
         </QueryProvider>
       </body>

@@ -9,7 +9,7 @@ import type { ApiSuccessResponse, ApiPaginatedResponse } from "@/lib/api";
 import type {
   Template,
   TemplateElement,
-  UpdateTemplateRequest,
+  TemplateWithElements,
   PaginationMeta,
   AssetFolder,
   AssetUploadResponse,
@@ -29,7 +29,8 @@ const elementsKey = (templateId: string) =>
   [`/owner/templates/${templateId}/elements`] as const;
 
 // ── Response type for detail endpoint (template + embedded elements) ─────────
-
+// BE returns { data: { template: {...}, elements: [...] } } (nested TemplateWithElements shape).
+// We flatten it internally for extractDetailData.
 type TemplateDetailResponse = Template & { elements: TemplateElement[] };
 
 // Runtime shape of templates from the list endpoint (includes embedded elements)
@@ -105,43 +106,6 @@ export function useTemplates(
 
   const templates = data?.items ?? [];
 
-  const updateMutation = useMutation({
-    mutationFn: async ({
-      id,
-      data,
-    }: {
-      id: string;
-      data: UpdateTemplateRequest;
-    }): Promise<Template> => {
-      const res = await api.patch<
-        ApiSuccessResponse<{ template: Template }>
-      >(`/owner/templates/${id}`, data);
-      return res.data.template;
-    },
-    onMutate: async ({ id, data }) => {
-      await queryClient.cancelQueries({ queryKey });
-      const previous = queryClient.getQueryData<TemplatePageData>(queryKey);
-      queryClient.setQueryData<TemplatePageData>(queryKey, (old) =>
-        old
-          ? {
-              ...old,
-              items: old.items.map((t) =>
-                t.id === id ? { ...t, ...data } : t,
-              ),
-            }
-          : old,
-      );
-      return { previous };
-    },
-    onError: (_err, _vars, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(queryKey, context.previous);
-      }
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: [TEMPLATES_KEY] });
-    },
-  });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string): Promise<void> => {
@@ -171,12 +135,8 @@ export function useTemplates(
     },
   });
 
-  const toggleActive = async (id: string, currentActive: boolean) => {
-    await updateMutation.mutateAsync({
-      id,
-      data: { isActive: !currentActive },
-    });
-  };
+  // isActive no longer exists in the API — toggle is a no-op pending UI removal
+  const toggleActive = async (_id: string, _currentActive: boolean) => {};
 
   const deleteTemplate = async (id: string) => {
     await deleteMutation.mutateAsync(id);
@@ -192,7 +152,7 @@ export function useTemplates(
       queryClient.invalidateQueries({ queryKey: [TEMPLATES_KEY] }),
     toggleActive,
     deleteTemplate,
-    isMutating: updateMutation.isPending || deleteMutation.isPending,
+    isMutating: deleteMutation.isPending,
   };
 }
 
@@ -201,6 +161,12 @@ export function useTemplates(
 export function useTemplateElements(templateId: string | null) {
   const { data, isLoading } = useQuery<TemplateElement[]>({
     queryKey: templateId ? elementsKey(templateId) : ["noop"],
+    queryFn: async () => {
+      const res = await api.get<ApiSuccessResponse<TemplateElement[]>>(
+        `/owner/templates/${templateId}/elements`,
+      );
+      return res.data;
+    },
     enabled: !!templateId,
     staleTime: 60_000,
   });
@@ -252,10 +218,12 @@ export function useTemplateDetail(id: string | null): UseTemplateDetailReturn {
   const { data, error, isLoading } = useQuery<TemplateDetailResponse>({
     queryKey: id ? templateKey(id) : ["noop"],
     queryFn: async () => {
-      const res = await api.get<
-        ApiSuccessResponse<{ template: TemplateDetailResponse }>
-      >(`/owner/templates/${id}`);
-      return res.data.template;
+      const res = await api.get<ApiSuccessResponse<TemplateWithElements>>(
+        `/owner/templates/${id}`,
+      );
+      // BE returns nested { template: {...}, elements: [...] } — flatten to our internal type
+      const { template, elements } = res.data;
+      return { ...template, elements } as TemplateDetailResponse;
     },
     enabled: !!id,
     staleTime: 60_000,
@@ -294,10 +262,6 @@ export interface TemplateSaveData {
   width: number;
   height: number;
   backgroundUrl: string;
-  overridePriceBase?: number | null;
-  overridePriceExtraPrint?: number | null;
-  overridePriceDigitalCopy?: number | null;
-  isActive: boolean;
   elements: Array<{
     id?: string; // existing element ID (for edit mode)
     elementType: string;
@@ -307,7 +271,6 @@ export interface TemplateSaveData {
     width: number;
     height: number;
     rotation: number;
-    opacity: number;
     properties: Record<string, unknown>;
   }>;
 }
@@ -321,6 +284,7 @@ export async function createTemplateWithElements(
   data: TemplateSaveData,
 ): Promise<Template> {
   // 1. Create the template
+  // POST /owner/templates returns { data: { template: Template } }
   const res = await api.post<ApiSuccessResponse<{ template: Template }>>(
     "/owner/templates",
     {
@@ -328,10 +292,6 @@ export async function createTemplateWithElements(
       width: data.width,
       height: data.height,
       backgroundUrl: data.backgroundUrl,
-      overridePriceBase: data.overridePriceBase ?? null,
-      overridePriceExtraPrint: data.overridePriceExtraPrint ?? null,
-      overridePriceDigitalCopy: data.overridePriceDigitalCopy ?? null,
-      isActive: data.isActive,
     },
   );
 
@@ -353,7 +313,6 @@ export async function createTemplateWithElements(
         width: Math.round(el.width),
         height: Math.round(el.height),
         rotation: Math.round(el.rotation),
-        opacity: Math.round(el.opacity),
         properties: el.properties,
       };
       console.log(
@@ -385,18 +344,15 @@ export async function updateTemplateWithElements(
   existingElements: TemplateElement[],
 ): Promise<Template> {
   // 1. Update template metadata
-  const templatePromise = api.patch<
-    ApiSuccessResponse<{ template: Template }>
-  >(`/owner/templates/${templateId}`, {
-    name: data.name,
-    width: data.width,
-    height: data.height,
-    backgroundUrl: data.backgroundUrl,
-    overridePriceBase: data.overridePriceBase ?? null,
-    overridePriceExtraPrint: data.overridePriceExtraPrint ?? null,
-    overridePriceDigitalCopy: data.overridePriceDigitalCopy ?? null,
-    isActive: data.isActive,
-  });
+  const templatePromise = api.patch<ApiSuccessResponse<{ template: Template }>>(
+    `/owner/templates/${templateId}`,
+    {
+      name: data.name,
+      width: data.width,
+      height: data.height,
+      ...(data.backgroundUrl ? { backgroundUrl: data.backgroundUrl } : {}),
+    },
+  );
 
   // 2. Determine element changes
   // existingIds holds UUIDs from the database.
@@ -440,7 +396,6 @@ export async function updateTemplateWithElements(
       width: Math.round(el.width),
       height: Math.round(el.height),
       rotation: Math.round(el.rotation),
-      opacity: Math.round(el.opacity),
       properties: el.properties,
     };
     console.log(`[updateTemplateWithElements] PATCH element ${el.id}`, payload);
@@ -456,7 +411,6 @@ export async function updateTemplateWithElements(
       width: Math.round(el.width),
       height: Math.round(el.height),
       rotation: Math.round(el.rotation),
-      opacity: Math.round(el.opacity),
       properties: el.properties,
     };
     console.log(

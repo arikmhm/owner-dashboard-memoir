@@ -1,17 +1,11 @@
 "use client";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// memoir. — Transaction History Page
-// EPIC-OD-05: Paginated, filterable transaction list
-// FEAT-OD-05.1: Owner Transaction History with Filtering
-// ─────────────────────────────────────────────────────────────────────────────
-
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import {
   Search,
   ChevronLeft,
   ChevronRight,
-  ChevronDown,
   RefreshCw,
   X,
   SlidersHorizontal,
@@ -22,15 +16,18 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { formatRupiah, formatDateTime, formatDate } from "@/lib/format";
-import { TX_STATUS_CONFIG, PAYMENT_METHOD_LABEL } from "@/lib/constants";
+import { formatNumber, formatDateTime } from "@/lib/format";
+import {
+  TX_STATUS_CONFIG,
+  PAYMENT_METHOD_LABEL,
+  TRANSACTION_TYPE_LABEL,
+} from "@/lib/constants";
 import {
   useTransactions,
   type TransactionFilters,
 } from "@/hooks/use-transactions";
 import { useKiosks } from "@/hooks/use-kiosks";
-import { useTemplates } from "@/hooks/use-templates";
-import type { TxStatus, PaymentMethod } from "@/lib/types";
+import type { TxStatus, PaymentMethod, TransactionType } from "@/lib/types";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -51,9 +48,16 @@ const PAYMENT_OPTIONS: { value: PaymentMethod; label: string }[] = [
   { value: "PG", label: "Payment Gateway" },
 ];
 
+const TYPE_OPTIONS: { value: TransactionType; label: string }[] = [
+  { value: "NORMAL", label: "Normal" },
+  { value: "EVENT", label: "Event" },
+];
+
 // ── Page Component ───────────────────────────────────────────────────────────
 
 export default function TransactionsPage() {
+  const router = useRouter();
+
   // ── Filter state ─────────────────────────────────────────────────────────
   const [filters, setFilters] = useState<TransactionFilters>({
     page: 1,
@@ -61,13 +65,11 @@ export default function TransactionsPage() {
   });
   const [searchInput, setSearchInput] = useState("");
   const [showFilters, setShowFilters] = useState(false);
-  const [expandedTxId, setExpandedTxId] = useState<string | null>(null);
 
   // ── Data fetching ────────────────────────────────────────────────────────
   const { transactions, meta, isLoading, isRefetching, error, refresh } =
     useTransactions(filters);
   const { kiosks } = useKiosks();
-  const { templates } = useTemplates();
 
   // ── Search debounce (300ms) ────────────────────────────────────────────
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -89,13 +91,14 @@ export default function TransactionsPage() {
   // ── Derived state ────────────────────────────────────────────────────────
   const totalPages = meta ? Math.ceil(meta.total / meta.limit) : 0;
   const currentPage = meta?.page ?? 1;
-  const colSpan = 7; // Order, Kiosk, Template, Detail, Metode, Total, Status
+  const colSpan = 8;
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (filters.kioskId) count++;
     if (filters.status) count++;
     if (filters.paymentMethod) count++;
+    if (filters.transactionType) count++;
     if (filters.startDate || filters.endDate) count++;
     if (filters.search) count++;
     return count;
@@ -125,26 +128,11 @@ export default function TransactionsPage() {
 
   const goToPage = useCallback((page: number) => {
     setFilters((prev) => ({ ...prev, page }));
-    setExpandedTxId(null);
   }, []);
 
   const handleLimitChange = useCallback((newLimit: number) => {
     setFilters((prev) => ({ ...prev, limit: newLimit, page: 1 }));
-    setExpandedTxId(null);
   }, []);
-
-  // ── Name lookup maps ─────────────────────────────────────────────────
-  const kioskNameMap = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const k of kiosks) map.set(k.id, k.name);
-    return map;
-  }, [kiosks]);
-
-  const templateNameMap = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const t of templates) map.set(t.id, t.name);
-    return map;
-  }, [templates]);
 
   // ── Render ─────────────────────────────────────────────────────────────
   return (
@@ -159,7 +147,6 @@ export default function TransactionsPage() {
       {/* Search & Filter Bar */}
       <div className="space-y-3">
         <div className="flex items-center gap-2">
-          {/* Search input — debounced 300ms */}
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-zinc-400" />
             <Input
@@ -178,7 +165,6 @@ export default function TransactionsPage() {
             )}
           </div>
 
-          {/* Filter toggle */}
           <Button
             variant="outline"
             size="sm"
@@ -194,7 +180,6 @@ export default function TransactionsPage() {
             )}
           </Button>
 
-          {/* Refresh */}
           <Button
             variant="outline"
             size="sm"
@@ -205,7 +190,6 @@ export default function TransactionsPage() {
             <RefreshCw className={cn("size-3", isRefetching && "animate-spin")} />
           </Button>
 
-          {/* Clear all */}
           {activeFilterCount > 0 && (
             <Button
               variant="ghost"
@@ -221,7 +205,6 @@ export default function TransactionsPage() {
         {/* Filter panel */}
         {showFilters && (
           <div className="flex flex-wrap items-end gap-x-5 gap-y-4 p-4 rounded-sm border border-zinc-200 bg-zinc-50/50">
-            {/* Kiosk filter */}
             <div className="flex flex-col gap-1.5">
               <label className="block text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
                 Kiosk
@@ -242,7 +225,6 @@ export default function TransactionsPage() {
               </select>
             </div>
 
-            {/* Status filter */}
             <div className="flex flex-col gap-1.5">
               <label className="block text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
                 Status
@@ -266,7 +248,6 @@ export default function TransactionsPage() {
               </select>
             </div>
 
-            {/* Payment method filter */}
             <div className="flex flex-col gap-1.5">
               <label className="block text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
                 Metode
@@ -290,7 +271,29 @@ export default function TransactionsPage() {
               </select>
             </div>
 
-            {/* Date range */}
+            <div className="flex flex-col gap-1.5">
+              <label className="block text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
+                Tipe
+              </label>
+              <select
+                value={filters.transactionType ?? ""}
+                onChange={(e) =>
+                  updateFilter(
+                    "transactionType",
+                    (e.target.value as TransactionType) || undefined,
+                  )
+                }
+                className="block h-8 text-xs rounded-sm border border-zinc-200 bg-white px-2.5 pr-7 text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-300"
+              >
+                <option value="">Semua Tipe</option>
+                {TYPE_OPTIONS.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="flex flex-col gap-1.5">
               <label className="block text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
                 Dari
@@ -304,6 +307,7 @@ export default function TransactionsPage() {
                 className="block h-8 text-xs rounded-sm border border-zinc-200 bg-white px-2.5 text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-300"
               />
             </div>
+
             <div className="flex flex-col gap-1.5">
               <label className="block text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
                 Sampai
@@ -337,6 +341,9 @@ export default function TransactionsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-zinc-100 bg-zinc-50">
+                <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider hidden md:table-cell">
+                  Tanggal
+                </th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider">
                   Order
                 </th>
@@ -344,10 +351,10 @@ export default function TransactionsPage() {
                   Kiosk
                 </th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider hidden md:table-cell">
-                  Template
+                  Cetak
                 </th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider hidden md:table-cell">
-                  Detail
+                  Digital
                 </th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-zinc-400 uppercase tracking-wider hidden lg:table-cell">
                   Metode
@@ -366,18 +373,20 @@ export default function TransactionsPage() {
                 <>
                   {Array.from({ length: 8 }).map((_, i) => (
                     <tr key={i}>
+                      <td className="px-4 py-3 hidden md:table-cell">
+                        <Skeleton className="h-3 w-24" />
+                      </td>
                       <td className="px-4 py-3">
-                        <Skeleton className="h-3 w-24 mb-1.5" />
-                        <Skeleton className="h-3 w-16" />
+                        <Skeleton className="h-3 w-24" />
                       </td>
                       <td className="px-4 py-3">
                         <Skeleton className="h-3 w-20" />
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell">
-                        <Skeleton className="h-3 w-20" />
+                        <Skeleton className="h-3 w-8" />
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell">
-                        <Skeleton className="h-3 w-28" />
+                        <Skeleton className="h-3 w-8" />
                       </td>
                       <td className="px-4 py-3 hidden lg:table-cell">
                         <Skeleton className="h-3 w-16" />
@@ -386,7 +395,7 @@ export default function TransactionsPage() {
                         <Skeleton className="h-3 w-16 ml-auto" />
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <Skeleton className="h-5 w-16 rounded-full ml-auto" />
+                        <Skeleton className="h-3 w-16 ml-auto" />
                       </td>
                     </tr>
                   ))}
@@ -427,110 +436,49 @@ export default function TransactionsPage() {
               {/* Data rows */}
               {transactions.map((tx) => {
                 const sc = TX_STATUS_CONFIG[tx.status];
-                const kioskName = kioskNameMap.get(tx.kioskId) ?? "—";
-                const templateName =
-                  templateNameMap.get(tx.templateId) ?? "—";
-                const isExpanded = expandedTxId === tx.id;
 
                 return (
                   <tr
                     key={tx.id}
-                    className="group cursor-pointer hover:bg-zinc-50/50 transition-colors"
-                    onClick={() =>
-                      setExpandedTxId(isExpanded ? null : tx.id)
-                    }
+                    className="cursor-pointer hover:bg-zinc-50/50 transition-colors"
+                    onClick={() => router.push(`/transactions/${tx.id}`)}
                   >
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1.5">
-                        <ChevronDown
-                          className={cn(
-                            "size-3 text-zinc-300 transition-transform shrink-0",
-                            isExpanded && "rotate-180",
-                          )}
-                        />
-                        <div>
-                          <p className="font-mono text-xs text-zinc-600">
-                            {tx.orderId}
-                          </p>
-                          <p className="text-[11px] text-zinc-400 mt-0.5">
-                            {formatDateTime(tx.createdAt)}
-                          </p>
-                        </div>
+                    <td className="px-4 py-3 text-xs text-zinc-500 hidden md:table-cell align-top">
+                      {formatDateTime(tx.createdAt)}
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      <div className="flex items-center gap-2">
+                        <p className="font-mono text-xs text-zinc-600">
+                          {tx.orderId}
+                        </p>
+                        {tx.transactionType === "EVENT" && (
+                          <span className="text-[10px] font-medium text-zinc-500 border border-zinc-200 rounded-sm px-1.5 py-0.5 leading-none">
+                            {TRANSACTION_TYPE_LABEL[tx.transactionType]}
+                          </span>
+                        )}
                       </div>
-
-                      {/* Expanded detail — rendered inside first cell for full-width span */}
-                      {isExpanded && (
-                        <div
-                          className="mt-3 pt-3 border-t border-zinc-100 space-y-2 text-xs text-zinc-500"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
-                            <div>
-                              <span className="text-zinc-400">
-                                Harga Dasar
-                              </span>
-                              <p className="font-medium text-zinc-700">
-                                {formatRupiah(tx.appliedBasePrice)}
-                              </p>
-                            </div>
-                            <div>
-                              <span className="text-zinc-400">
-                                Extra Print
-                              </span>
-                              <p className="font-medium text-zinc-700">
-                                {formatRupiah(tx.appliedExtraPrintPrice)} ×{" "}
-                                {Math.max(0, tx.printQty - 1)}
-                              </p>
-                            </div>
-                            <div>
-                              <span className="text-zinc-400">
-                                Digital Copy
-                              </span>
-                              <p className="font-medium text-zinc-700">
-                                {tx.hasDigitalCopy
-                                  ? formatRupiah(tx.appliedDigitalCopyPrice)
-                                  : "—"}
-                              </p>
-                            </div>
-                            {tx.paidAt && (
-                              <div>
-                                <span className="text-zinc-400">
-                                  Dibayar pada
-                                </span>
-                                <p className="font-medium text-zinc-700">
-                                  {formatDate(tx.paidAt)}
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
                     </td>
                     <td className="px-4 py-3 text-xs text-zinc-700 align-top">
-                      {kioskName}
+                      {tx.kioskName}
                     </td>
                     <td className="px-4 py-3 text-xs text-zinc-500 hidden md:table-cell align-top">
-                      {templateName}
+                      {tx.printQty}
                     </td>
-                    <td className="px-4 py-3 hidden md:table-cell align-top">
-                      <div className="text-xs text-zinc-500">
-                        <p>
-                          {tx.printQty} cetak
-                          {tx.hasDigitalCopy && " + digital"}
-                        </p>
-                      </div>
+                    <td className="px-4 py-3 text-xs text-zinc-500 hidden md:table-cell align-top">
+                      {tx.hasDigitalCopy ? "Ya" : "—"}
                     </td>
                     <td className="px-4 py-3 text-xs text-zinc-500 hidden lg:table-cell align-top">
                       {PAYMENT_METHOD_LABEL[tx.paymentMethod] ??
                         tx.paymentMethod}
                     </td>
                     <td className="px-4 py-3 text-right text-sm font-medium text-zinc-900 tabular-nums align-top">
-                      {formatRupiah(tx.totalAmount)}
+                      {formatNumber(tx.totalAmount)}
                     </td>
                     <td className="px-4 py-3 text-right align-top">
-                      <Badge className={cn("text-[10px]", sc.className)}>
-                        {sc.label}
-                      </Badge>
+                      <div className={cn("flex items-center justify-end gap-1.5", sc.textClass)}>
+                        <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", sc.dotClass)} />
+                        <span className="text-xs">{sc.label}</span>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -551,7 +499,6 @@ export default function TransactionsPage() {
                 </span>
               </p>
 
-              {/* Items per page selector */}
               <select
                 value={filters.limit ?? DEFAULT_LIMIT}
                 onChange={(e) => handleLimitChange(Number(e.target.value))}
@@ -577,7 +524,6 @@ export default function TransactionsPage() {
                   <ChevronLeft className="size-3.5" />
                 </Button>
 
-                {/* Page numbers — show max 5 around current */}
                 {(() => {
                   const pages: number[] = [];
                   let start = Math.max(1, currentPage - 2);

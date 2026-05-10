@@ -25,11 +25,30 @@ export async function login(
 }
 
 /**
- * Server-side logout via Next.js route handler.
- * Clears HttpOnly cookie at same origin (guaranteed) and deletes token from DB.
+ * Logout the current user.
+ *
+ * Flow:
+ * 1. POST /api/logout (Next.js handler)
+ * 2. Server clears refresh_token cookie
+ * 3. Server notifies backend to delete refresh token from DB (best-effort)
+ * 4. Always returns 204 No Content (even if no refresh token or backend fails)
+ *
+ * Frontend handles response:
+ * - Ignores response status (always treat as success per security spec)
+ * - Clears access token from memory (done by caller)
+ * - Redirects to /login (done by caller)
+ *
+ * Note: This is a same-origin call, so errors are extremely unlikely.
+ * Any errors are ignored (silent fail) — logout is best-effort.
  */
 export async function logout(): Promise<void> {
-  await fetch("/api/logout", { method: "POST" });
+  try {
+    await fetch("/api/logout", { method: "POST" });
+  } catch (err) {
+    // Network error or fetch failure (extremely unlikely, same-origin)
+    // Still treat as success — caller will clear token and redirect
+    console.warn("[logout] API call failed:", err);
+  }
 }
 
 /**
@@ -50,4 +69,3 @@ export async function getSubscription(): Promise<SubscriptionResponse | null> {
     return null;
   }
 }
-

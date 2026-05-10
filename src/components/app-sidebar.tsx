@@ -8,8 +8,8 @@ import {
   MonitorSmartphone,
   Layers,
   ReceiptText,
-  Wallet,
   CreditCard,
+  Landmark,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -61,8 +61,8 @@ const NAV_ITEMS = [
   { href: "/kiosks", label: "Kiosk", icon: MonitorSmartphone },
   { href: "/templates", label: "Template", icon: Layers },
   { href: "/transactions", label: "Transaksi", icon: ReceiptText },
-  { href: "/wallet", label: "Wallet", icon: Wallet },
   { href: "/subscription", label: "Subscription", icon: CreditCard },
+  { href: "/payment-configs", label: "Payment Gateway", icon: Landmark },
 ] as const;
 
 export function AppSidebar() {

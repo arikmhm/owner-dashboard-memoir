@@ -1,8 +1,6 @@
 # owner-dashboard — memoir. Owner Dashboard
 
-Dashboard web untuk studio owner mengelola kiosk, template, subscription, wallet, dan transaksi. Frontend-only app — semua data dari Backend API via Next.js rewrite proxy.
-
-Dokumentasi platform (PRD, API docs, schema) ada di **Notion** (workspace "memoir"). Akses via Notion MCP tools (`notion-search`, `notion-fetch`). Saat butuh referensi API contract, response shapes, atau business rules, baca dari sana — jangan duplikasi.
+Dashboard web untuk studio owner mengelola kiosk, template, subscription, payment configs, dan transaksi. Frontend-only app — semua data dari Backend API via Next.js rewrite proxy.
 
 ## Commands
 
@@ -60,7 +58,7 @@ Satu-satunya server-side logic: route handler `src/app/api/logout/route.ts` — 
 
 ### API & Types
 
-- Types di `src/lib/types.ts` HARUS match dengan response shapes di Notion API Docs
+- Types di `src/lib/types.ts` HARUS match dengan response shapes dari Backend API
 - Monetary values: number (integer Rupiah) — JANGAN pakai floating point
 - IDs: string (UUID v4), Timestamps: string (ISO 8601), Nullable: `T | null`
 - Paginated response: `{ data: T[], meta: { page, limit, total } }`
@@ -95,15 +93,18 @@ Aturan di-enforce di backend, tapi frontend harus handle secara UX:
 - **Pending upgrade** — AuthContext track `pendingUpgrade` (PENDING_PAYMENT saat upgrade in-flight)
 - **QRIS payment flow** — QR code + countdown timer + auto-poll payment status
 - **Max kiosks reached** → disable "Tambah Kiosk" (cek `activeCount` vs `maxKiosks`)
-- **Single PENDING withdrawal** → disable tombol withdrawal
 - **Template delete guard** → 409 jika punya transaksi, sarankan nonaktifkan
 - **Photo slot minimum** → tolak delete PHOTO_SLOT terakhir
 - **Unique captureOrder** → validasi di form sebelum submit
 - **Immutable price snapshot** → transaksi tampilkan harga saat transaksi, bukan harga kiosk saat ini
 
-## Referensi Dokumentasi
+### BYOP — Payment Configs
 
-Semua dokumentasi platform ada di **Notion** (workspace "memoir"), akses via MCP tools:
+Owner mengelola payment provider mereka sendiri via `owner_payment_configs`:
 
-- **PRD Owner Dashboard** — `notion-search` keyword "PRD-02"
-- **API Docs** — sub-pages di "API DOCS": auth, owner, owner-finance, owner-subscription
+- **Providers**: `DOKU`, `MIDTRANS`, `XENDIT`
+- **Payment methods**: `PG` (dynamic QRIS), `CASH` (konfirmasi manual), `STATIC_QRIS` (QRIS statis owner — flow sama seperti CASH)
+- **Status config**: `PENDING_VALIDATION` → `ACTIVE` (validasi OK) / `INVALID` (gagal) / `DISABLED` (disuspend)
+- **Max 1 default** per owner — tampilkan badge "Default" pada config yang aktif sebagai default
+- **Credentials**: JANGAN tampilkan raw credentials — hanya tampilkan `credentialsLastFour`
+- **Transaction types**: `NORMAL` (single session, default), `EVENT` (multi-session/batch)

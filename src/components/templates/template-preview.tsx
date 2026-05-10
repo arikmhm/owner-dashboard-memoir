@@ -143,7 +143,7 @@ function ElementPreview({
     height: `${toPercent(el.height, canvasHeight)}%`,
     transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined,
     transformOrigin: "top left",
-    opacity: el.opacity / 100,
+    opacity: 1,
     zIndex: el.sequence,
   };
 

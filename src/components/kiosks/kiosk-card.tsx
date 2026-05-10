@@ -6,17 +6,10 @@
 // Part of FEAT-OD-03.1 — Kiosk List & Cards
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardAction,
-} from "@/components/ui/card";
-import { Wifi, WifiOff, Settings, KeyRound } from "lucide-react";
-import { formatRupiah, formatDate } from "@/lib/format";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Settings, KeyRound } from "lucide-react";
+import { formatNumber } from "@/lib/format";
 import type { Kiosk } from "@/lib/types";
 
 interface KioskCardProps {
@@ -33,58 +26,16 @@ export function KioskCard({
   const isPaired = !!kiosk.pairedAt;
 
   return (
-    <Card
-      className={`py-0 gap-0 rounded-sm shadow-none transition-opacity ${
-        kiosk.isActive
-          ? "border-zinc-200 opacity-100"
-          : "border-zinc-200 opacity-55"
-      }`}
-    >
-      {/* Header — name, status, badge */}
+    <Card className="py-0 gap-0 rounded-sm shadow-none">
+      {/* Header — name, pairing status */}
       <CardHeader className="py-4 pb-0">
-        <div className="flex items-start gap-3 min-w-0">
-          <div
-            className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center ${
-              kiosk.isActive ? "text-zinc-900" : "text-zinc-400"
-            }`}
-          >
-            {kiosk.isActive ? (
-              <Wifi className="h-4 w-4" />
-            ) : (
-              <WifiOff className="h-4 w-4" />
-            )}
-          </div>
-
-          <div className="min-w-0 flex-1 space-y-1">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
             <CardTitle className="text-sm font-medium text-zinc-900 truncate">
               {kiosk.name}
             </CardTitle>
-            <p className="text-xs text-zinc-500">
-              {isPaired ? (
-                <>
-                  <span className="text-zinc-700 font-medium">Terpair</span>
-                  {" — "}
-                  {formatDate(kiosk.pairedAt!)}
-                </>
-              ) : (
-                <span className="text-zinc-400">Belum dipair</span>
-              )}
-            </p>
           </div>
         </div>
-
-        <CardAction>
-          <Badge
-            variant={kiosk.isActive ? "default" : "secondary"}
-            className={`rounded-full text-xs font-medium border-0 ${
-              kiosk.isActive
-                ? "bg-zinc-900 text-white"
-                : "bg-zinc-100 text-zinc-400"
-            }`}
-          >
-            {kiosk.isActive ? "Aktif" : "Nonaktif"}
-          </Badge>
-        </CardAction>
       </CardHeader>
 
       {/* Pricing + Actions */}
@@ -95,11 +46,11 @@ export function KioskCard({
           <PriceItem label="Digital Copy" value={kiosk.priceDigitalCopy} />
         </div>
 
-        <div className="flex items-center gap-2 pt-1">
+        <div className="flex flex-col gap-2 pt-1">
           <Button
             variant="outline"
             size="sm"
-            className="text-xs"
+            className="w-full text-xs"
             onClick={() => onEdit(kiosk)}
           >
             <Settings className="h-3.5 w-3.5 mr-1.5" />
@@ -108,7 +59,7 @@ export function KioskCard({
           <Button
             variant="outline"
             size="sm"
-            className="text-xs"
+            className="w-full text-xs"
             onClick={() => onGeneratePairing(kiosk)}
           >
             <KeyRound className="h-3.5 w-3.5 mr-1.5" />
@@ -127,7 +78,7 @@ function PriceItem({ label, value }: { label: string; value: number }) {
     <div className="space-y-0.5">
       <p className="text-xs text-zinc-400">{label}</p>
       <p className="text-sm font-medium text-zinc-900 tabular-nums">
-        {formatRupiah(value)}
+        {formatNumber(value)}
       </p>
     </div>
   );

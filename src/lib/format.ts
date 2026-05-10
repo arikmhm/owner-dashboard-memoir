@@ -4,8 +4,17 @@ const rupiahFormatter = new Intl.NumberFormat("id-ID", {
   minimumFractionDigits: 0,
 });
 
+const numberFormatter = new Intl.NumberFormat("id-ID", {
+  minimumFractionDigits: 0,
+});
+
 export function formatRupiah(amount: number): string {
   return rupiahFormatter.format(amount);
+}
+
+/** Format angka tanpa simbol mata uang, e.g. 30.000 */
+export function formatNumber(amount: number): string {
+  return numberFormatter.format(amount);
 }
 
 export function formatDate(

@@ -39,7 +39,6 @@ export default function KiosksPage() {
   // ── Kiosk data via SWR ─────────────────────────────────────────────────
   const {
     kiosks,
-    activeCount,
     isLoading,
     error,
     createKiosk,
@@ -54,7 +53,7 @@ export default function KiosksPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editKiosk, setEditKiosk] = useState<Kiosk | null>(null);
   const [pairingKiosk, setPairingKiosk] = useState<Kiosk | null>(null);
-  const maxReached = activeCount >= maxKiosks && maxKiosks > 0;
+  const maxReached = kiosks.length >= maxKiosks && maxKiosks > 0;
 
   // ── Handlers ───────────────────────────────────────────────────────────
   const handleOpenCreate = useCallback(() => {

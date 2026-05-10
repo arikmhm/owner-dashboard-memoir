@@ -9,18 +9,15 @@
 import { useDashboard } from "@/hooks/use-dashboard";
 import { formatRupiah } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Wallet,
   TrendingUp,
   MonitorSmartphone,
   ReceiptText,
   AlertTriangle,
   XCircle,
-  CheckCircle2,
   Ban,
   RefreshCw,
 } from "lucide-react";
@@ -125,21 +122,18 @@ function SubscriptionBanner({
     default:
       return (
         <div className="flex items-center gap-3 rounded-sm border border-zinc-200 bg-white px-4 py-3">
-          <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-zinc-900">
-              Plan <span className="font-semibold">{planName}</span> aktif
+              Plan <span className="font-semibold">{planName}</span>
             </p>
             <p className="mt-0.5 text-xs text-zinc-400">
-              Berakhir pada {periodEndFormatted} · {daysLeft} hari lagi
+              Berakhir {periodEndFormatted} · {daysLeft} hari lagi
             </p>
           </div>
-          <Badge
-            variant="secondary"
-            className="shrink-0 bg-emerald-50 text-xs text-emerald-700"
-          >
-            Aktif
-          </Badge>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            <span className="text-xs text-zinc-500">Aktif</span>
+          </div>
         </div>
       );
   }
@@ -155,7 +149,7 @@ function SubscriptionBannerSkeleton() {
         <Skeleton className="h-4 w-48" />
         <Skeleton className="h-3 w-64" />
       </div>
-      <Skeleton className="h-6 w-14 rounded-full" />
+      <Skeleton className="h-3 w-14" />
     </div>
   );
 }
@@ -240,12 +234,6 @@ export default function DashboardPage() {
   const statCards: StatCardProps[] = summary
     ? [
         {
-          label: "Saldo Wallet",
-          value: formatRupiah(summary.walletBalance),
-          icon: Wallet,
-          sub: "Tersedia untuk ditarik",
-        },
-        {
           label: "Pendapatan Bulan Ini",
           value: formatRupiah(summary.revenueThisMonth),
           icon: TrendingUp,
@@ -281,7 +269,9 @@ export default function DashboardPage() {
           className="gap-1.5 text-zinc-400 hover:text-zinc-700"
           aria-label="Refresh data dashboard"
         >
-          <RefreshCw className={cn("h-3.5 w-3.5", isRefetching && "animate-spin")} />
+          <RefreshCw
+            className={cn("h-3.5 w-3.5", isRefetching && "animate-spin")}
+          />
           <span className="hidden text-xs sm:inline">Refresh</span>
         </Button>
       </div>

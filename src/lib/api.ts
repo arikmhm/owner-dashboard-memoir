@@ -66,6 +66,14 @@ let refreshPromise: Promise<string | null> | null = null;
 /**
  * Attempt to refresh the access token using the HttpOnly refresh_token cookie.
  * Uses a shared promise to prevent concurrent refresh requests.
+ *
+ * Returns:
+ * - string: new access token if refresh successful
+ * - null: if 401 (invalid/expired token, server cleared cookie)
+ *
+ * Throws:
+ * - Error: if 429 rate limit (caller should backoff)
+ * - Error: if network error (caller can retry)
  */
 export async function refreshAccessToken(): Promise<string | null> {
   try {
@@ -74,17 +82,56 @@ export async function refreshAccessToken(): Promise<string | null> {
       credentials: "include",
     });
 
-    if (!res.ok) return null;
+    if (res.ok) {
+      const json = await res.json();
+      const newToken: string | undefined = json?.data?.accessToken;
 
-    const json = await res.json();
-    const newToken: string | undefined = json?.data?.accessToken;
-
-    if (newToken) {
-      setToken(newToken);
-      return newToken;
+      if (newToken) {
+        setToken(newToken);
+        return newToken;
+      }
+      return null;
     }
+
+    // Parse error response
+    let errorData: ApiErrorResponse;
+    try {
+      errorData = await res.json();
+    } catch {
+      errorData = { error: "UNKNOWN", message: "Refresh gagal" };
+    }
+
+    // 401: Invalid/expired token → server cleared refresh_token cookie
+    // Return null so caller knows to logout (removeToken + redirect login)
+    if (res.status === 401) {
+      console.warn(
+        `[refreshAccessToken] 401 ${errorData.error}: ${errorData.message}`,
+      );
+      return null;
+    }
+
+    // 429: Rate limited → throw so caller can handle backoff
+    if (res.status === 429) {
+      const err = new Error(
+        "Terlalu banyak percobaan refresh, coba lagi nanti",
+      );
+      console.warn("[refreshAccessToken] 429 rate limited");
+      throw err;
+    }
+
+    // 500+: Server error → return null, transient error (don't logout).
+    // apiFetch caller will treat as failed refresh but won't clear token immediately.
+    console.error(
+      `[refreshAccessToken] ${res.status} ${errorData.error}: ${errorData.message}`,
+    );
     return null;
-  } catch {
+  } catch (err) {
+    // Network error or other exception
+    if (err instanceof Error) {
+      console.error("[refreshAccessToken] Error:", err.message);
+      throw err;
+    }
+    console.error("[refreshAccessToken] Unknown error");
     return null;
   }
 }
@@ -127,11 +174,17 @@ async function apiFetch<T>(
         });
       }
 
-      const newToken = await refreshPromise;
+      try {
+        const newToken = await refreshPromise;
 
-      if (newToken) {
-        // Retry the original request with the new token
-        return apiFetch<T>(endpoint, options, true);
+        if (newToken) {
+          // Retry the original request with the new token
+          return apiFetch<T>(endpoint, options, true);
+        }
+      } catch (refreshErr) {
+        // refreshAccessToken threw error (e.g. 429 rate limit).
+        // Let it propagate so caller can handle, don't clear token yet.
+        throw refreshErr;
       }
     }
 

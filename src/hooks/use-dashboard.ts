@@ -27,9 +27,8 @@ export function useDashboard(): UseDashboardReturn {
   const { data, isLoading, isRefetching, error } = useQuery<DashboardSummary>({
     queryKey: ["/owner/dashboard"],
     queryFn: async () => {
-      const res = await api.get<ApiSuccessResponse<DashboardSummary>>(
-        "/owner/dashboard",
-      );
+      const res =
+        await api.get<ApiSuccessResponse<DashboardSummary>>("/owner/dashboard");
       return res.data;
     },
     staleTime: 30_000,

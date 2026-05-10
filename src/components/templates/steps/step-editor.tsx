@@ -18,8 +18,6 @@ import {
   Trash2,
   Save,
   Type as TypeIcon,
-  ToggleLeft,
-  ToggleRight,
   ImageIcon,
   Layers,
   MousePointer2,
@@ -32,7 +30,6 @@ import {
   Maximize,
   Hand,
   Loader2,
-  ChevronRight,
   Upload,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -79,7 +76,6 @@ function createElement(
     x: 30 + (((counter - 1) * 25) % 150),
     y: 30 + (((counter - 1) * 25) % 150),
     rotation: 0,
-    opacity: 100,
     sequence: maxSeq + 1,
   };
 
@@ -148,7 +144,7 @@ interface StepEditorProps {
 
 // ── Component ──────────────────────────────────────────────────────────────────
 export function StepEditor({
-  croppedImage,
+  croppedImage: croppedImageProp,
   onBack: onBackProp,
   editTemplate,
   editElements,
@@ -157,6 +153,10 @@ export function StepEditor({
   const queryClient = useQueryClient();
   const onBack = onBackProp ?? (() => router.push("/templates"));
   const isEditMode = !!editTemplate;
+
+  // Freeze croppedImage at mount — prevents background from disappearing
+  // if parent re-renders with stale/different template data mid-session.
+  const [croppedImage] = useState(() => croppedImageProp);
 
   // ── Initialize state (from edit data or defaults) ──
   const [elements, setElements] = useState<TemplateElement[]>(() => {
@@ -169,7 +169,6 @@ export function StepEditor({
         width: el.width,
         height: el.height,
         rotation: el.rotation,
-        opacity: el.opacity,
         sequence: el.sequence,
         properties: el.properties,
       }));
@@ -178,22 +177,6 @@ export function StepEditor({
   });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [templateName, setTemplateName] = useState(editTemplate?.name ?? "");
-  const [isActive, setIsActive] = useState(editTemplate?.isActive ?? true);
-  const [overridePriceBase, setOverridePriceBase] = useState(
-    editTemplate?.overridePriceBase != null
-      ? String(editTemplate.overridePriceBase)
-      : "",
-  );
-  const [overridePriceExtraPrint, setOverridePriceExtraPrint] = useState(
-    editTemplate?.overridePriceExtraPrint != null
-      ? String(editTemplate.overridePriceExtraPrint)
-      : "",
-  );
-  const [overridePriceDigitalCopy, setOverridePriceDigitalCopy] = useState(
-    editTemplate?.overridePriceDigitalCopy != null
-      ? String(editTemplate.overridePriceDigitalCopy)
-      : "",
-  );
   const [previewMode, setPreviewMode] = useState(false);
   const [showVarDropdown, setShowVarDropdown] = useState(false);
   const [zoom, setZoom] = useState(1);
@@ -201,7 +184,6 @@ export function StepEditor({
   const [panMode, setPanMode] = useState(false);
   const snapEnabled = true;
   const [isSaving, setIsSaving] = useState(false);
-  const [showTemplateOptions, setShowTemplateOptions] = useState(false);
   const contentInputRef = useRef<HTMLInputElement>(null);
   const canvasAreaRef = useRef<HTMLDivElement>(null);
   const imageUploadRef = useRef<HTMLInputElement>(null);
@@ -424,14 +406,6 @@ export function StepEditor({
         width: canvasW,
         height: canvasH,
         backgroundUrl,
-        overridePriceBase: overridePriceBase ? Number(overridePriceBase) : null,
-        overridePriceExtraPrint: overridePriceExtraPrint
-          ? Number(overridePriceExtraPrint)
-          : null,
-        overridePriceDigitalCopy: overridePriceDigitalCopy
-          ? Number(overridePriceDigitalCopy)
-          : null,
-        isActive,
         elements: resequencedElements.map((el) => ({
           id: isEditMode ? el.id : undefined,
           elementType: el.elementType,
@@ -441,7 +415,6 @@ export function StepEditor({
           width: Math.round(el.width),
           height: Math.round(el.height),
           rotation: Math.round(el.rotation),
-          opacity: Math.round(el.opacity),
           properties: el.properties,
         })),
       };
@@ -470,9 +443,16 @@ export function StepEditor({
         toast.success("Template berhasil dibuat");
       }
 
-      // Invalidate all template & element caches so the list page
-      // fetches fresh data including newly created/updated elements
+      // Invalidate list + specific detail + elements caches
       await queryClient.invalidateQueries({ queryKey: ["templates"] });
+      if (isEditMode && editTemplate) {
+        await queryClient.invalidateQueries({
+          queryKey: [`/owner/templates/${editTemplate.id}`],
+        });
+        await queryClient.invalidateQueries({
+          queryKey: [`/owner/templates/${editTemplate.id}/elements`],
+        });
+      }
 
       router.push("/templates");
     } catch (err) {
@@ -612,86 +592,12 @@ export function StepEditor({
                   className="h-8 text-sm"
                 />
               </div>
-              <button
-                onClick={() => setShowTemplateOptions(!showTemplateOptions)}
-                className="flex items-center gap-1 text-[10px] text-zinc-400 hover:text-zinc-600 transition-colors"
-              >
-                <ChevronRight
-                  className={cn(
-                    "size-3 transition-transform",
-                    showTemplateOptions && "rotate-90",
-                  )}
-                />
-                Opsi lainnya
-              </button>
-              {showTemplateOptions && (
-                <div className="space-y-2.5 pt-1 border-t border-zinc-100">
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-zinc-500">
-                      Override Harga Dasar
-                    </label>
-                    <Input
-                      type="number"
-                      placeholder="Kosongkan = default"
-                      value={overridePriceBase}
-                      onChange={(e) => setOverridePriceBase(e.target.value)}
-                      className="h-8 text-sm"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-zinc-500">
-                      Override Extra Print
-                    </label>
-                    <Input
-                      type="number"
-                      placeholder="Kosongkan = default"
-                      value={overridePriceExtraPrint}
-                      onChange={(e) => setOverridePriceExtraPrint(e.target.value)}
-                      className="h-8 text-sm"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-zinc-500">
-                      Override Digital Copy
-                    </label>
-                    <Input
-                      type="number"
-                      placeholder="Kosongkan = default"
-                      value={overridePriceDigitalCopy}
-                      onChange={(e) => setOverridePriceDigitalCopy(e.target.value)}
-                      className="h-8 text-sm"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-zinc-500">
-                      Status
-                    </span>
-                    <button
-                      onClick={() => setIsActive(!isActive)}
-                      className={cn(
-                        "flex items-center gap-1.5 text-xs font-medium transition-colors",
-                        isActive ? "text-zinc-800" : "text-zinc-400",
-                      )}
-                    >
-                      {isActive ? (
-                        <>
-                          <ToggleRight className="size-4" /> Aktif
-                        </>
-                      ) : (
-                        <>
-                          <ToggleLeft className="size-4" /> Nonaktif
-                        </>
-                      )}
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-zinc-500">Dimensi</span>
-                    <span className="font-mono text-zinc-700">
-                      {canvasW}×{canvasH}px
-                    </span>
-                  </div>
-                </div>
-              )}
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-zinc-500">Dimensi</span>
+                <span className="font-mono text-zinc-700">
+                  {canvasW}×{canvasH}px
+                </span>
+              </div>
             </div>
           </div>
 
@@ -845,48 +751,23 @@ export function StepEditor({
                     </div>
                   ))}
                 </div>
-                {/* Rotation & Opacity */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-0.5">
-                    <label className="text-[10px] font-medium text-zinc-400 flex items-center gap-1">
-                      <RotateCw className="size-2.5" /> Rotasi
-                    </label>
-                    <div className="flex items-center gap-1">
-                      <Input
-                        type="number"
-                        value={safeNum(selectedEl.rotation)}
-                        onChange={(e) =>
-                          handleElementUpdate(selectedEl.id, {
-                            rotation: safeNum(e.target.value),
-                          })
-                        }
-                        className="h-7 text-xs font-mono flex-1"
-                      />
-                      <span className="text-[10px] text-zinc-400">°</span>
-                    </div>
-                  </div>
-                  <div className="space-y-0.5">
-                    <label className="text-[10px] font-medium text-zinc-400 flex items-center gap-1">
-                      <Eye className="size-2.5" /> Opacity
-                    </label>
-                    <div className="flex items-center gap-1">
-                      <Input
-                        type="number"
-                        min={0}
-                        max={100}
-                        value={safeNum(selectedEl.opacity, 100)}
-                        onChange={(e) =>
-                          handleElementUpdate(selectedEl.id, {
-                            opacity: Math.min(
-                              100,
-                              Math.max(0, safeNum(e.target.value)),
-                            ),
-                          })
-                        }
-                        className="h-7 text-xs font-mono flex-1"
-                      />
-                      <span className="text-[10px] text-zinc-400">%</span>
-                    </div>
+                {/* Rotation */}
+                <div className="space-y-0.5">
+                  <label className="text-[10px] font-medium text-zinc-400 flex items-center gap-1">
+                    <RotateCw className="size-2.5" /> Rotasi
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <Input
+                      type="number"
+                      value={safeNum(selectedEl.rotation)}
+                      onChange={(e) =>
+                        handleElementUpdate(selectedEl.id, {
+                          rotation: safeNum(e.target.value),
+                        })
+                      }
+                      className="h-7 text-xs font-mono flex-1"
+                    />
+                    <span className="text-[10px] text-zinc-400">°</span>
                   </div>
                 </div>
 

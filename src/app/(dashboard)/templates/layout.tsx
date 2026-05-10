@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-    title: "Template — memoir.",
+    title: "memoir. | Dashboard",
 };
 
 export default function TemplatesLayout({

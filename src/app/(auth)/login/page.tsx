@@ -27,6 +27,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 /**
  * Map API error to user-friendly message.
+ * - 400 → validation error (invalid format or empty fields)
  * - 401 → generic credential error (no info leak)
  * - 429 → rate limit feedback
  * - 500+ → generic server error
@@ -34,6 +35,8 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 function getErrorMessage(err: unknown): string {
   if (err instanceof ApiError) {
     switch (err.status) {
+      case 400:
+        return "Email atau password tidak valid";
       case 401:
         return "Email atau password salah";
       case 429:

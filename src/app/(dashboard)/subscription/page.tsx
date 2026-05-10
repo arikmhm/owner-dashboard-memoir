@@ -9,17 +9,16 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import {
   ArrowUpCircle,
-  ChevronLeft,
-  ChevronRight,
   RefreshCw,
   Loader2,
   CreditCard,
   AlertCircle,
+  ChevronRight as ChevronRightIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -31,26 +30,19 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { formatRupiah, formatDate, formatDateTime } from "@/lib/format";
-import { QRCodeSVG } from "qrcode.react";
+import { formatRupiah, formatDate } from "@/lib/format";
 import {
   SUBSCRIPTION_STATUS_CONFIG,
-  INVOICE_STATUS_CONFIG,
-  BILLING_PERIOD_LABEL,
 } from "@/lib/constants";
 import { useAuth } from "@/components/auth-provider";
 import {
   usePlans,
   useInvoices,
   submitSubscription,
-  checkPaymentStatus,
 } from "@/hooks/use-subscription";
 import { ApiError } from "@/lib/api";
 import { toast } from "sonner";
-import type {
-  BillingPeriod,
-  SubscriptionPlan,
-} from "@/lib/types";
+import type { BillingPeriod, SubscriptionPlan } from "@/lib/types";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -59,6 +51,9 @@ const INVOICE_LIMIT = 10;
 // ── Page Component ───────────────────────────────────────────────────────────
 
 export default function SubscriptionPage() {
+  // ── Router ───────────────────────────────────────────────────────────────
+  const router = useRouter();
+
   // ── Auth context ─────────────────────────────────────────────────────────
   const {
     subscription,
@@ -69,15 +64,13 @@ export default function SubscriptionPage() {
 
   // ── Data fetching ────────────────────────────────────────────────────────
   const { plans, isLoading: plansLoading } = usePlans();
-  const [invoicePage, setInvoicePage] = useState(1);
   const {
     invoices,
-    meta: invoiceMeta,
     isLoading: invoicesLoading,
     isRefetching: invoicesRefetching,
     error: invoicesError,
     refresh: refreshInvoices,
-  } = useInvoices(invoicePage, INVOICE_LIMIT);
+  } = useInvoices(1, INVOICE_LIMIT);
 
   // ── Upgrade dialog state ───────────────────────────────────────────────
   const [upgradeOpen, setUpgradeOpen] = useState(false);
@@ -86,33 +79,23 @@ export default function SubscriptionPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // ── Payment check state ────────────────────────────────────────────────
-  const [checkingInvoiceId, setCheckingInvoiceId] = useState<string | null>(
-    null,
-  );
-  // ── QR code display state ─────────────────────────────────────────────
-  const [showQrInvoiceId, setShowQrInvoiceId] = useState<string | null>(null);
+  // (Moved to invoice detail page)
 
   // ── Derived ────────────────────────────────────────────────────────────
-  const invoiceTotalPages = invoiceMeta
-    ? Math.ceil(invoiceMeta.total / invoiceMeta.limit)
-    : 0;
+  // Filter invoices to show only PAID
+  const paidInvoices = useMemo(
+    () => invoices.filter((inv) => inv.status === "PAID"),
+    [invoices],
+  );
 
   const activePlan = useMemo(() => {
     if (!subscription || !plans.length) return null;
     return plans.find((p) => p.id === subscription.planId) ?? null;
   }, [subscription, plans]);
 
-
   const statusConfig = subscriptionStatus
     ? SUBSCRIPTION_STATUS_CONFIG[subscriptionStatus]
     : null;
-
-  const daysLeft = useMemo(() => {
-    if (!subscription?.currentPeriodEnd) return null;
-    const end = new Date(subscription.currentPeriodEnd);
-    const now = new Date();
-    return Math.max(0, Math.ceil((end.getTime() - now.getTime()) / 86400000));
-  }, [subscription]);
 
   // ── Handlers ───────────────────────────────────────────────────────────
 
@@ -151,44 +134,10 @@ export default function SubscriptionPage() {
     [billingPeriod, refreshSubscription, refreshInvoices],
   );
 
-  const handleCheckPayment = useCallback(
-    async (invoiceId: string) => {
-      setCheckingInvoiceId(invoiceId);
-
-      try {
-        const result = await checkPaymentStatus(invoiceId);
-
-        if (result.status === "PAID") {
-          toast.success("Pembayaran berhasil! Subscription aktif.");
-          await refreshSubscription();
-          refreshInvoices();
-        } else if (result.status === "FAILED") {
-          toast.error("Pembayaran gagal atau kadaluarsa.");
-          refreshInvoices();
-        } else {
-          toast("Pembayaran belum terdeteksi. Coba lagi nanti.", {
-            icon: <AlertCircle className="size-4 text-yellow-500" />,
-          });
-        }
-      } catch (err) {
-        if (err instanceof ApiError) {
-          toast.error(err.message || "Gagal mengecek pembayaran.");
-        } else {
-          toast.error("Terjadi kesalahan saat mengecek pembayaran.");
-        }
-      } finally {
-        setCheckingInvoiceId(null);
-      }
-    },
-    [refreshSubscription, refreshInvoices],
-  );
-
   const handleRefreshAll = useCallback(() => {
     refreshSubscription();
     refreshInvoices();
   }, [refreshSubscription, refreshInvoices]);
-
-
 
   // ── Render ─────────────────────────────────────────────────────────────
   return (
@@ -242,53 +191,19 @@ export default function SubscriptionPage() {
                       {activePlan?.name ?? subscription?.planId}
                     </p>
                   )}
-                  {subscription && (
+                  {subscription?.currentPeriodEnd && (
                     <p className="text-xs text-zinc-400">
-                      Billing {BILLING_PERIOD_LABEL[subscription.billingPeriod]}{" "}
-                      · {formatRupiah(subscription.pricePaid)}/periode
+                      Berakhir {formatDate(subscription.currentPeriodEnd)}
                     </p>
                   )}
                 </div>
                 {statusConfig && (
-                  <Badge
-                    className={cn("text-xs shrink-0", statusConfig.className)}
-                  >
-                    {statusConfig.label}
-                  </Badge>
-                )}
-              </div>
-
-              {subscription?.currentPeriodStart &&
-                subscription?.currentPeriodEnd && (
-                  <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div className="bg-zinc-50 rounded-sm px-4 py-3 space-y-0.5">
-                      <p className="text-zinc-400">Mulai</p>
-                      <p className="font-medium text-zinc-900">
-                        {formatDate(subscription.currentPeriodStart)}
-                      </p>
-                    </div>
-                    <div className="bg-zinc-50 rounded-sm px-4 py-3 space-y-0.5">
-                      <p className="text-zinc-400">Berakhir</p>
-                      <p className="font-medium text-zinc-900">
-                        {formatDate(subscription.currentPeriodEnd)}
-                        {daysLeft !== null && (
-                          <span
-                            className={cn(
-                              "ml-1",
-                              daysLeft < 3
-                                ? "text-red-600 font-medium"
-                                : daysLeft < 7
-                                  ? "text-yellow-600 font-medium"
-                                  : "text-zinc-400",
-                            )}
-                          >
-                            ({daysLeft} hari lagi)
-                          </span>
-                        )}
-                      </p>
-                    </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className={cn("w-1.5 h-1.5 rounded-full", statusConfig.dotClass)} />
+                    <span className={cn("text-xs", statusConfig.textClass)}>{statusConfig.label}</span>
                   </div>
                 )}
+              </div>
 
               {subscriptionStatus === "EXPIRED" && (
                 <div className="rounded-sm border border-red-200 bg-red-50 p-3 text-xs text-red-700 flex items-center gap-2">
@@ -318,34 +233,17 @@ export default function SubscriptionPage() {
         </div>
       </div>
 
-      {/* Plan Features Summary */}
-      {activePlan && (
-        <div className="text-xs text-zinc-500 space-y-1 px-1">
-          <p className="text-zinc-400 font-medium uppercase tracking-wider">
-            Fitur Plan {activePlan.name}
-          </p>
-          <p>✓ Maksimal {activePlan.maxKiosks} kiosk aktif</p>
-          <p>✓ Template tidak terbatas</p>
-          <p>✓ Semua metode pembayaran (CASH, QRIS, PG)</p>
-        </div>
-      )}
-
       {/* Invoice History */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-zinc-700 uppercase tracking-wider">
-            Histori Invoice
-          </h2>
-          {invoiceMeta && !invoicesLoading && (
-            <p className="text-xs text-zinc-400">{invoiceMeta.total} invoice</p>
-          )}
-        </div>
+        <h2 className="text-sm font-medium text-zinc-500">
+          Histori Pembayaran
+        </h2>
 
         {/* Invoice Error */}
         {invoicesError && (
           <div className="rounded-sm border border-red-200 bg-red-50 p-3 text-xs text-red-700 flex items-center gap-2">
             <AlertCircle className="size-3.5 shrink-0" />
-            <span>Gagal memuat histori invoice.</span>
+            <span>Gagal memuat histori pembayaran.</span>
             <button
               onClick={refreshInvoices}
               className="underline hover:text-red-900"
@@ -357,7 +255,7 @@ export default function SubscriptionPage() {
 
         <div className="border border-zinc-200 rounded-sm overflow-hidden bg-white">
           {/* Loading */}
-          {invoicesLoading && invoices.length === 0 && (
+          {invoicesLoading && paidInvoices.length === 0 && (
             <div className="divide-y divide-zinc-100">
               {Array.from({ length: 3 }).map((_, i) => (
                 <div
@@ -368,165 +266,54 @@ export default function SubscriptionPage() {
                     <Skeleton className="h-4 w-24" />
                     <Skeleton className="h-3 w-40" />
                   </div>
-                  <Skeleton className="h-5 w-16 rounded-full" />
+                  <Skeleton className="h-4 w-4" />
                 </div>
               ))}
             </div>
           )}
 
           {/* Empty */}
-          {!invoicesLoading && invoices.length === 0 && !invoicesError && (
+          {!invoicesLoading && paidInvoices.length === 0 && !invoicesError && (
             <div className="py-12 text-center">
               <div className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center mx-auto mb-2">
                 <CreditCard className="size-4 text-zinc-400" />
               </div>
               <p className="text-sm font-medium text-zinc-500">
-                Belum ada invoice
+                Belum ada pembayaran
               </p>
               <p className="text-xs text-zinc-400 mt-1">
-                Invoice subscription akan muncul di sini.
+                Histori pembayaran subscription akan muncul di sini.
               </p>
             </div>
           )}
 
-          {/* Invoice rows */}
-          {invoices.length > 0 && (
+          {/* Invoice rows - Simplified */}
+          {paidInvoices.length > 0 && (
             <div className="divide-y divide-zinc-100">
-              {invoices.map((inv) => {
-                const sc =
-                  INVOICE_STATUS_CONFIG[
-                    inv.status as keyof typeof INVOICE_STATUS_CONFIG
-                  ];
-                const isChecking = checkingInvoiceId === inv.id;
-
-                const isQrVisible = showQrInvoiceId === inv.id;
-
-                return (
-                  <div key={inv.id}>
-                    <div className="flex items-center justify-between px-5 py-3.5 hover:bg-zinc-50/50 transition-colors gap-4">
-                      <div className="min-w-0 space-y-0.5">
-                        <p className="text-sm font-medium text-zinc-900 tabular-nums">
-                          {formatRupiah(inv.amount)}
-                        </p>
-                        <p className="text-xs text-zinc-400 truncate">
-                          {formatDate(inv.periodStart)} —{" "}
-                          {formatDate(inv.periodEnd)} ·{" "}
-                          {BILLING_PERIOD_LABEL[inv.billingPeriod]}
-                        </p>
-                        {inv.orderId && (
-                          <p className="text-[10px] font-mono text-zinc-400">
-                            {inv.orderId}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-2 shrink-0">
-                        {inv.paidAt && (
-                          <span className="text-xs text-zinc-400 hidden sm:block">
-                            {formatDate(inv.paidAt)}
-                          </span>
-                        )}
-
-                        {/* Actions for PENDING invoices */}
-                        {inv.status === "PENDING" && (
-                          <div className="flex items-center gap-1.5">
-                            {inv.qrString && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-6 text-[10px] gap-1 px-2"
-                                onClick={() =>
-                                  setShowQrInvoiceId(
-                                    isQrVisible ? null : inv.id,
-                                  )
-                                }
-                              >
-                                {isQrVisible ? "Tutup QR" : "Lihat QR"}
-                              </Button>
-                            )}
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-6 text-[10px] gap-1 px-2"
-                              onClick={() => handleCheckPayment(inv.id)}
-                              disabled={isChecking}
-                            >
-                              {isChecking ? (
-                                <Loader2 className="size-2.5 animate-spin" />
-                              ) : (
-                                <RefreshCw className="size-2.5" />
-                              )}
-                              Cek
-                            </Button>
-                          </div>
-                        )}
-
-                        <Badge className={cn("text-[10px]", sc?.className)}>
-                          {sc?.label ?? inv.status}
-                        </Badge>
-                      </div>
-                    </div>
-
-                    {/* Inline QR code display */}
-                    {isQrVisible && inv.qrString && (
-                      <div className="px-5 pb-4 flex items-start gap-4 bg-zinc-50/50">
-                        <div className="rounded-sm border border-zinc-200 bg-white p-2">
-                          <QRCodeSVG
-                            value={inv.qrString}
-                            size={100}
-                            level="M"
-                          />
-                        </div>
-                        <div className="text-xs text-zinc-500 space-y-1 pt-1">
-                          <p>
-                            Scan QR code untuk membayar via e-wallet atau mobile
-                            banking.
-                          </p>
-                          {inv.paymentExpiresAt && (
-                            <p className="text-zinc-400">
-                              Bayar sebelum{" "}
-                              <span className="font-medium text-zinc-600">
-                                {formatDateTime(inv.paymentExpiresAt)}
-                              </span>
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    )}
+              {paidInvoices.map((inv) => (
+                <button
+                  key={inv.id}
+                  onClick={() => router.push(`/subscription/invoice/${inv.id}`)}
+                  className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-zinc-50 transition-colors gap-4 text-left"
+                >
+                  <div className="min-w-0 space-y-0.5">
+                    <p className="text-sm font-medium text-zinc-900 tabular-nums">
+                      {formatRupiah(inv.amount)}
+                    </p>
+                    <p className="text-xs text-zinc-400 truncate">
+                      {inv.paidAt ? formatDate(inv.paidAt) : "—"}
+                    </p>
                   </div>
-                );
-              })}
-            </div>
-          )}
 
-          {/* Invoice pagination */}
-          {invoiceTotalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-zinc-100 bg-zinc-50/50">
-              <p className="text-xs text-zinc-400">
-                Hal. {invoicePage} dari {invoiceTotalPages}
-              </p>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setInvoicePage((p) => Math.max(1, p - 1))}
-                  disabled={invoicePage <= 1}
-                  className="h-7 w-7 p-0"
-                >
-                  <ChevronLeft className="size-3.5" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    setInvoicePage((p) => Math.min(invoiceTotalPages, p + 1))
-                  }
-                  disabled={invoicePage >= invoiceTotalPages}
-                  className="h-7 w-7 p-0"
-                >
-                  <ChevronRight className="size-3.5" />
-                </Button>
-              </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      <span className="text-xs text-zinc-500">Lunas</span>
+                    </div>
+                    <ChevronRightIcon className="size-4 text-zinc-300" />
+                  </div>
+                </button>
+              ))}
             </div>
           )}
         </div>
@@ -583,9 +370,9 @@ export default function SubscriptionPage() {
             >
               Tahunan
             </span>
-            <Badge variant="secondary" className="text-[10px]">
+            <span className="text-[10px] text-zinc-400 border border-zinc-200 rounded-sm px-1.5 py-0.5">
               Hemat 2 bulan
-            </Badge>
+            </span>
           </div>
 
           {/* Plans grid */}
@@ -628,10 +415,8 @@ export default function SubscriptionPage() {
                     )}
                   >
                     {isCurrentPlan && (
-                      <div className="absolute -top-2.5 left-4">
-                        <Badge className="text-[9px] bg-zinc-950 text-white hover:bg-zinc-950">
-                          Plan Aktif
-                        </Badge>
+                      <div className="absolute -top-2.5 left-4 flex items-center gap-1 bg-zinc-950 text-white text-[9px] font-medium px-1.5 py-0.5 rounded-sm">
+                        Plan Aktif
                       </div>
                     )}
 
@@ -693,4 +478,3 @@ export default function SubscriptionPage() {
     </div>
   );
 }
-

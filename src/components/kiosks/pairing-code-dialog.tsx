@@ -2,8 +2,14 @@
 
 // ─────────────────────────────────────────────────────────────────────────────
 // memoir. — Pairing Code Dialog
-// Generate or reset pairing code for a kiosk (FEAT-OD-03.3)
-// Includes confirmation dialog for re-pair and prominent code display
+// Generate new pairing code for a kiosk (FEAT-OD-03.3)
+// POST /owner/kiosks/{id}/generate-pairing
+// 
+// Important: Generating new code resets device connection:
+// - Kiosk's deviceToken & pairedAt are cleared
+// - Old code becomes invalid
+// - Any running Electron device loses access (401 response)
+// - Device must re-pair with new code before expiry
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useCallback, useEffect } from "react";
@@ -64,7 +70,18 @@ export function PairingCodeDialog({
       toast.success("Pairing code berhasil di-generate!");
     } catch (err) {
       if (err instanceof ApiError) {
-        toast.error(err.message || "Gagal generate pairing code");
+        // Handle specific error codes from BE API
+        if (err.status === 404) {
+          toast.error(
+            "Kiosk tidak ditemukan atau Anda tidak memiliki akses. Coba refresh halaman."
+          );
+        } else if (err.status === 401) {
+          toast.error("Session expired. Silakan login kembali.");
+        } else {
+          toast.error(
+            err.message || "Gagal generate pairing code. Coba lagi nanti."
+          );
+        }
       } else {
         toast.error("Terjadi kesalahan, coba lagi nanti");
       }
@@ -94,8 +111,7 @@ export function PairingCodeDialog({
           <DialogHeader>
             <DialogTitle>Pairing Code</DialogTitle>
             <DialogDescription>
-              Masukkan code ini pada Electron kiosk runner untuk menghubungkan
-              ke akun Anda.
+              Masukkan code ini pada kiosk untuk menghubungkan ke akun Anda.
             </DialogDescription>
           </DialogHeader>
 
@@ -148,7 +164,7 @@ export function PairingCodeDialog({
           </DialogTitle>
           <DialogDescription>
             {isPaired
-              ? "Membuat pairing code baru akan memutuskan koneksi Electron yang sedang aktif. Kiosk perlu dipair ulang."
+              ? "Membuat pairing code baru akan memutuskan koneksi kiosk yang sedang aktif. Kiosk perlu dipair ulang."
               : `Generate pairing code untuk kiosk "${kiosk.name}".`}
           </DialogDescription>
         </DialogHeader>
@@ -157,8 +173,8 @@ export function PairingCodeDialog({
           <div className="flex items-start gap-3 rounded-lg border border-yellow-200 bg-yellow-50 p-3">
             <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 shrink-0" />
             <p className="text-sm text-yellow-800">
-              Electron runner yang sedang aktif akan mendapat error 401 dan
-              masuk ke layar pairing ulang.
+              Kiosk yang sedang aktif akan terputus dan masuk ke layar pairing
+              ulang.
             </p>
           </div>
         )}
