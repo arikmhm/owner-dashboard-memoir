@@ -5,7 +5,7 @@
 
 // ── Enums (mirror backend DB enums) ──────────────────────────────────────────
 
-export type UserRole = "platform_admin" | "studio_owner";
+export type UserRole = "ADMIN" | "OWNER";
 export type BillingPeriod = "MONTHLY" | "YEARLY";
 export type SubscriptionStatus =
   | "ACTIVE"

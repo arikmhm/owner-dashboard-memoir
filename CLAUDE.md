@@ -13,6 +13,22 @@ npm run typecheck    # tsc --noEmit
 
 Tidak ada test framework. CI: lint → typecheck → build.
 
+## Git Workflow
+
+Dua branch utama:
+- `staging` — branch kerja sehari-hari, deploy ke Vercel staging environment
+- `main` — production, **JANGAN push langsung** — hanya via PR dari `staging`
+
+```
+staging  →  PR  →  main (prod)
+```
+
+**Aturan:**
+- Semua pekerjaan dilakukan di branch `staging`
+- Siap deploy ke prod → buat PR dari `staging` ke `main` di GitHub
+- Direct push ke `main` diblokir via GitHub branch protection
+- Hotfix tetap lewat `staging` → `main`
+
 ## Tech Stack
 
 Next.js 16 (App Router), React 19, TypeScript strict, Tailwind CSS v4, shadcn/ui (New York style, zinc theme), lucide-react icons, TanStack React Query v5, react-hook-form + Zod, Konva.js + react-konva (template editor), react-image-crop (background upload/cropping), sonner (toasts), qrcode.react. Package manager: npm.
